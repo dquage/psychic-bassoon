@@ -2,6 +2,7 @@ package dl.paragraph;
 
 import com.google.common.base.Stopwatch;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
 import dl.paragraph.pojo.Categorie;
 import dl.paragraph.pojo.Resultat;
 import org.datavec.api.records.reader.RecordReader;
@@ -15,6 +16,7 @@ import org.deeplearning4j.models.embeddings.inmemory.InMemoryLookupTable;
 import org.deeplearning4j.models.embeddings.loader.WordVectorSerializer;
 import org.deeplearning4j.models.paragraphvectors.ParagraphVectors;
 import org.deeplearning4j.models.word2vec.VocabWord;
+import org.deeplearning4j.optimize.listeners.ScoreIterationListener;
 import org.deeplearning4j.text.documentiterator.LabelAwareIterator;
 import org.deeplearning4j.text.documentiterator.LabelledDocument;
 import org.deeplearning4j.text.documentiterator.LabelsSource;
@@ -32,6 +34,7 @@ import java.nio.file.Files;
 import java.nio.file.StandardOpenOption;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 public class Categorisation {
@@ -76,6 +79,20 @@ public class Categorisation {
                 .tokenizerFactory(tokenizerFactory)
                 .build();
 
+//        paragraphVectors = new ParagraphVectors.Builder()
+//                .minWordFrequency(5)
+//                .iterations(5)
+//                .windowSize(5)
+//                .sampling(0)
+//                .learningRate(0.025)
+//                .minLearningRate(0.001)
+//                .batchSize(1000)
+//                .epochs(20)
+//                .iterate(iterator)
+//                .trainWordVectors(true)
+//                .tokenizerFactory(tokenizerFactory)
+//                .build();
+
         // Start model training
         System.out.println("Train starting...");
         Stopwatch started = Stopwatch.createStarted();
@@ -104,6 +121,7 @@ public class Categorisation {
                 Arrays.asList(CATEGORIES),
                 (InMemoryLookupTable<VocabWord>) paragraphVectors.getLookupTable());
 
+        Stopwatch started = Stopwatch.createStarted();
         System.out.println("Evaluation starting...");
 //        int limit = 10;
 //        while (iterator.hasNextDocument() && limit > 0) {
@@ -130,11 +148,13 @@ public class Categorisation {
             Pair<String, Double> score3 = scores.get(2);
             resultats.add(Resultat.builder()
                     .libelle(document.getContent())
+                    .labelExpected(document.getLabels().get(0))
                     .categorie1(Categorie.builder().label(score1.getFirst()).score(score1.getSecond()).build())
                     .categorie2(Categorie.builder().label(score2.getFirst()).score(score2.getSecond()).build())
                     .categorie3(Categorie.builder().label(score3.getFirst()).score(score3.getSecond()).build())
                     .build());
         }
+        System.out.println("Evaluation done In " + started.stop().elapsed(TimeUnit.SECONDS) + "s");
 
         saveResultats(resultats);
         saveResultatsParCategorie(resultats);
@@ -142,9 +162,115 @@ public class Categorisation {
 
     private void saveResultats(List<Resultat> resultats) throws IOException {
 
+        // Stats accuracy
+        int nbItems = resultats.size();
+        int nbItemsAccurates = 0;
+        double scores1Sum = 0;
+        double scores1AccurateSum = 0;
+
+        // Calculs de la justesse des prédictions par tranches de précision
+        double nbItemsPrecision80minSum = 0;
+        double nbItemsPrecision70minSum = 0;
+        double nbItemsPrecision60minSum = 0;
+        double nbItemsPrecision50minSum = 0;
+        double nbItemsPrecision40minSum = 0;
+        double nbItemsPrecision30minSum = 0;
+        double nbItemsAccuratePrecision80minSum = 0;
+        double nbItemsAccuratePrecision70minSum = 0;
+        double nbItemsAccuratePrecision60minSum = 0;
+        double nbItemsAccuratePrecision50minSum = 0;
+        double nbItemsAccuratePrecision40minSum = 0;
+        double nbItemsAccuratePrecision30minSum = 0;
+
+        for (Resultat resultat : resultats) {
+            double score = resultat.getCategorie1().getScore() * 100;
+            scores1Sum += score;
+
+            if (score > 80) {
+                nbItemsPrecision80minSum++;
+            } else if (score > 70) {
+                nbItemsPrecision70minSum++;
+            } else if (score > 60) {
+                nbItemsPrecision60minSum++;
+            } else if (score > 50) {
+                nbItemsPrecision50minSum++;
+            } else if (score > 40) {
+                nbItemsPrecision40minSum++;
+            } else {
+                nbItemsPrecision30minSum++;
+            }
+
+            if (resultat.isAccurate()) {
+                nbItemsAccurates++;
+                scores1AccurateSum += score;
+
+                if (score > 80) {
+                    nbItemsAccuratePrecision80minSum++;
+                } else if (score > 70) {
+                    nbItemsAccuratePrecision70minSum++;
+                } else if (score > 60) {
+                    nbItemsAccuratePrecision60minSum++;
+                } else if (score > 50) {
+                    nbItemsAccuratePrecision50minSum++;
+                } else if (score > 40) {
+                    nbItemsAccuratePrecision40minSum++;
+                } else {
+                    nbItemsAccuratePrecision30minSum++;
+                }
+            }
+        }
+
+        String moyenneScores1All = nbItems > 0 ? String.format("%2.2f", (scores1Sum / nbItems)) : "0";
+        String moyenneScores1Accurate = nbItemsAccurates > 0 ? String.format("%2.2f", (scores1AccurateSum / nbItemsAccurates)) : "0";
+
+        String tauxJustesse80min = nbItemsPrecision80minSum > 0 ? String.format("%2.2f", (nbItemsAccuratePrecision80minSum * 100 / nbItemsPrecision80minSum)) : "0";
+        String tauxJustesse70min = nbItemsPrecision70minSum > 0 ? String.format("%2.2f", (nbItemsAccuratePrecision70minSum * 100 / nbItemsPrecision70minSum)) : "0";
+        String tauxJustesse60min = nbItemsPrecision60minSum > 0 ? String.format("%2.2f", (nbItemsAccuratePrecision60minSum * 100 / nbItemsPrecision60minSum)) : "0";
+        String tauxJustesse50min = nbItemsPrecision50minSum > 0 ? String.format("%2.2f", (nbItemsAccuratePrecision50minSum * 100 / nbItemsPrecision50minSum)) : "0";
+        String tauxJustesse40min = nbItemsPrecision40minSum > 0 ? String.format("%2.2f", (nbItemsAccuratePrecision40minSum * 100 / nbItemsPrecision40minSum)) : "0";
+        String tauxJustesse30min = nbItemsPrecision30minSum > 0 ? String.format("%2.2f", (nbItemsAccuratePrecision30minSum * 100 / nbItemsPrecision30minSum)) : "0";
+
+
+
         StringBuilder sb = new StringBuilder();
+
+        sb.append("Résultats : ");
+        sb.append("\n");
+        sb.append("Nombre éléments testés : ").append(nbItems);
+        sb.append("\n");
+        sb.append("Nombre éléments catégorisés avec succès : ").append(nbItemsAccurates);
+        sb.append("\n");
+        sb.append("Moyenne de la précision de la meilleure catégorie trouvée : ").append(moyenneScores1All).append("%");
+        sb.append("\n");
+        sb.append("Moyenne de la précision des catégories exactes trouvées : ").append(moyenneScores1Accurate).append("%");
+
+        sb.append("\n");
+        sb.append("Précision > 80% : ").append(nbItemsPrecision80minSum).append(" dont ")
+                .append(nbItemsAccuratePrecision80minSum).append(" justes donc ").append(tauxJustesse80min).append("%");
+        sb.append("\n");
+        sb.append("Précision > 70% : ").append(nbItemsPrecision70minSum).append(" dont ")
+                .append(nbItemsAccuratePrecision70minSum).append(" justes donc ").append(tauxJustesse70min).append("%");
+        sb.append("\n");
+        sb.append("Précision > 60% : ").append(nbItemsPrecision60minSum).append(" dont ")
+                .append(nbItemsAccuratePrecision60minSum).append(" justes donc ").append(tauxJustesse60min).append("%");
+        sb.append("\n");
+        sb.append("Précision > 50% : ").append(nbItemsPrecision50minSum).append(" dont ")
+                .append(nbItemsAccuratePrecision50minSum).append(" justes donc ").append(tauxJustesse50min).append("%");
+        sb.append("\n");
+        sb.append("Précision > 40% : ").append(nbItemsPrecision40minSum).append(" dont ")
+                .append(nbItemsAccuratePrecision40minSum).append(" justes donc ").append(tauxJustesse40min).append("%");
+        sb.append("\n");
+        sb.append("Précision > 30% : ").append(nbItemsPrecision30minSum).append(" dont ")
+                .append(nbItemsAccuratePrecision30minSum).append(" justes donc ").append(tauxJustesse30min).append("%");
+
+        sb.append("\n");
+        sb.append("\n");
+        sb.append("\n");
+
         for (Resultat resultat : resultats) {
             sb.append(resultat.getLibelle());
+            sb.append("\n");
+            sb.append("[EXPC][").append(resultat.getLabelExpected()).append("]");
             sb.append("\n");
             sb.append("[").append(resultat.getCategorie1().getScoreArrondi()).append("][").append(resultat.getCategorie1().getLabel()).append("]");
             sb.append("\t");
@@ -165,9 +291,22 @@ public class Categorisation {
 
     private void saveResultatsParCategorie(List<Resultat> resultats) throws IOException {
 
+
+        Map<String, List<String>> categs = Maps.newHashMap();
+        for (String category : CATEGORIES) {
+            List<String> libelles = Lists.newArrayList();
+            categs.put(category, libelles);
+            for (Resultat resultat : resultats) {
+                if (resultat.getCategorie1().getLabel().equals(category)) {
+                    libelles.add(resultat.getLibelle());
+                }
+            }
+        }
+
+
         StringBuilder sb = new StringBuilder();
         for (String category : CATEGORIES) {
-            sb.append(category);
+            sb.append(category).append("\t").append(categs.get(category).size());
             sb.append("\n");
             sb.append("\n");
             for (Resultat resultat : resultats) {

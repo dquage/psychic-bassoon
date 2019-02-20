@@ -4,16 +4,13 @@ import org.datavec.api.records.reader.RecordReader;
 import org.datavec.api.writable.Writable;
 import org.deeplearning4j.text.sentenceiterator.SentenceIterator;
 import org.deeplearning4j.text.sentenceiterator.SentencePreProcessor;
-import org.nd4j.linalg.dataset.DataSet;
 
 import java.util.List;
 
 public class MySentenceIterator implements SentenceIterator {
 
-    protected RecordReader recordReader;
-    protected DataSet last;
-    protected boolean useCurrent = false;
-    protected SentencePreProcessor sentencePreProcessor;
+    private RecordReader recordReader;
+    private SentencePreProcessor sentencePreProcessor;
 
     public MySentenceIterator(RecordReader recordReader) {
         this.recordReader = recordReader;

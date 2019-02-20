@@ -10,6 +10,6 @@ public class Categorie {
     private String label;
     private double score;
     public String getScoreArrondi() {
-            return String.format("%2.2f", this.score);
+            return String.format("%2.2f", this.score * 100);
         }
 }
