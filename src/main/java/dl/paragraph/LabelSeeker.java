@@ -1,5 +1,6 @@
-package dl.classifier_vectors;
+package dl.paragraph;
 
+import org.nd4j.linalg.primitives.Counter;
 import org.nd4j.linalg.primitives.Pair;
 import org.deeplearning4j.models.embeddings.inmemory.InMemoryLookupTable;
 import org.deeplearning4j.models.word2vec.VocabWord;
@@ -8,6 +9,7 @@ import org.nd4j.linalg.ops.transforms.Transforms;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.PriorityQueue;
 
 /**
  * This is primitive seeker for nearest labels.
@@ -32,14 +34,25 @@ public class LabelSeeker {
      * @return
      */
     public List<Pair<String, Double>> getScores(INDArray vector) {
+
         List<Pair<String, Double>> result = new ArrayList<>();
+        Counter<String> distances = new Counter<>();
+
         for (String label: labelsUsed) {
             INDArray vecLabel = lookupTable.vector(label);
-            if (vecLabel == null) throw new IllegalStateException("Label '"+ label+"' has no known vector!");
+            if (vecLabel == null) {
+                continue;
+            }
 
             double sim = Transforms.cosineSim(vector, vecLabel);
-            result.add(new Pair<String, Double>(label, sim));
+            distances.incrementCount(label, (float) sim);
         }
+
+        PriorityQueue<Pair<String, Double>> pairs = distances.asPriorityQueue();
+        for (Pair<String, Double> pair : pairs) {
+            result.add(pair);
+        }
+
         return result;
     }
 }

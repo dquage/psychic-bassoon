@@ -27,6 +27,9 @@ import org.deeplearning4j.eval.RegressionEvaluation;
 import org.deeplearning4j.iterator.CnnSentenceDataSetIterator;
 import org.deeplearning4j.iterator.LabeledSentenceProvider;
 import org.deeplearning4j.iterator.provider.CollectionLabeledSentenceProvider;
+import org.deeplearning4j.models.embeddings.learning.ElementsLearningAlgorithm;
+import org.deeplearning4j.models.embeddings.learning.impl.elements.SkipGram;
+import org.deeplearning4j.models.word2vec.VocabWord;
 import org.deeplearning4j.models.word2vec.iterator.Word2VecDataSetIterator;
 import org.deeplearning4j.nn.api.OptimizationAlgorithm;
 import org.deeplearning4j.nn.conf.GradientNormalization;
@@ -45,6 +48,7 @@ import org.nd4j.linalg.api.ndarray.INDArray;
 import org.nd4j.linalg.dataset.DataSet;
 import org.nd4j.linalg.dataset.api.iterator.DataSetIterator;
 import org.nd4j.linalg.learning.config.Adam;
+import org.nd4j.linalg.learning.config.Nesterovs;
 import org.nd4j.linalg.learning.config.Sgd;
 import org.nd4j.linalg.lossfunctions.LossFunctions;
 
@@ -108,6 +112,18 @@ public class CategorisationTrain {
 
         System.out.println("Build model....");
 
+//        MultiLayerConfiguration conf = new NeuralNetConfiguration.Builder()
+//                .seed(seed)
+//                .weightInit(WeightInit.XAVIER)
+//                .updater(new Nesterovs(0.01, 0.9))
+//                .list()
+//                .layer(0, new DenseLayer.Builder().nIn(nbIn_features_count).nOut(20)
+//                        .activation(Activation.RELU)
+//                        .build())
+//                .layer(1, new OutputLayer.Builder(LossFunctions.LossFunction.XENT)
+//                        .activation(Activation.SIGMOID)
+//                        .nIn(20).nOut(nbOut_classes_count).build())
+//                .build();
 
         // Modèle généré à 3Ko mais pas de platage à l'évaluation
         MultiLayerConfiguration conf = new NeuralNetConfiguration.Builder()
@@ -370,13 +386,15 @@ public class CategorisationTrain {
         // Permet de conditionner, transformer, enlever les data que l'on récupère du CSV
         TransformProcess tp = new TransformProcess.Builder(inputDataSchema)
                 .removeColumns("Id", "NumCba", "Montant", "NumCompte")
-                .categoricalToInteger("Categorie")
+//                .categoricalToInteger("Categorie")
                 .build();
 
         RecordReader rr = new CSVRecordReader();
         rr.initialize(new FileSplit(new ClassPathResource(csvFileClasspath).getFile()));
         LocalTransformProcessRecordReader transformProcessRecordReader = new LocalTransformProcessRecordReader(rr, tp);
-        return new MyDataSetIterator(transformProcessRecordReader, batchSize, 1, 0, modelWords);
+        MyDataSetIterator myDataSetIterator = new MyDataSetIterator(transformProcessRecordReader, batchSize, 1, 0, modelWords);
+//        myDataSetIterator.setCollectMetaData(true);
+        return myDataSetIterator;
     }
 
     /**

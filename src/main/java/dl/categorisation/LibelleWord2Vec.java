@@ -45,7 +45,7 @@ public class LibelleWord2Vec implements Model {
                 featureVector = featureVector.add(vec);
             }
         }
-//        featureVector.divi(wordEmbeddings.size());
+        featureVector.divi(wordEmbeddings.size());
         return featureVector;
     }
 

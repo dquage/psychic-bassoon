@@ -2,27 +2,22 @@ package dl.classifier_vectors;
 
 import au.com.bytecode.opencsv.CSVWriter;
 import org.datavec.api.util.ClassPathResource;
-import org.deeplearning4j.models.embeddings.inmemory.InMemoryLookupTable;
 import org.deeplearning4j.models.paragraphvectors.ParagraphVectors;
 import org.deeplearning4j.models.word2vec.VocabWord;
 import org.deeplearning4j.models.word2vec.Word2Vec;
 import org.deeplearning4j.models.word2vec.wordstore.VocabCache;
 import org.deeplearning4j.text.documentiterator.FileLabelAwareIterator;
 import org.deeplearning4j.text.documentiterator.LabelAwareIterator;
-import org.deeplearning4j.text.documentiterator.LabelledDocument;
 import org.deeplearning4j.text.documentiterator.LabelsSource;
 import org.deeplearning4j.text.sentenceiterator.BasicLineIterator;
 import org.deeplearning4j.text.sentenceiterator.SentenceIterator;
 import org.deeplearning4j.text.tokenization.tokenizer.preprocessor.CommonPreprocessor;
 import org.deeplearning4j.text.tokenization.tokenizerfactory.DefaultTokenizerFactory;
 import org.deeplearning4j.text.tokenization.tokenizerfactory.TokenizerFactory;
-import org.nd4j.linalg.api.ndarray.INDArray;
-import org.nd4j.linalg.primitives.Pair;
 
 import java.io.FileWriter;
 import java.io.IOException;
 import java.util.Collection;
-import java.util.List;
 
 /**
  * This is basic example for documents classification done with DL4j ParagraphVectors.
@@ -130,41 +125,6 @@ public class LibelleVectorsClassifierExample {
         paragraphVectors.fit();
     }
 
-    public void checkUnlabeledData() throws IOException {
-      /*
-      At this point we assume that we have model built and we can check
-      which categories our unlabeled document falls into.
-      So we'll start loading our unlabeled documents and checking them
-     */
-        ClassPathResource unClassifiedResource = new ClassPathResource("paravec/unlabeled");
-        FileLabelAwareIterator unClassifiedIterator = new FileLabelAwareIterator.Builder().addSourceFolder(unClassifiedResource.getFile()).build();
-
-     /*
-      Now we'll iterate over unlabeled data, and check which label it could be assigned to
-      Please note: for many domains it's normal to have 1 document fall into few labels at once,
-      with different "weight" for each.
-     */
-        MeansBuilder meansBuilder = new MeansBuilder((InMemoryLookupTable<VocabWord>) paragraphVectors.getLookupTable(), tokenizerFactory);
-        LabelSeeker seeker = new LabelSeeker(iterator.getLabelsSource().getLabels(), (InMemoryLookupTable<VocabWord>) paragraphVectors.getLookupTable());
-
-        while (unClassifiedIterator.hasNextDocument()) {
-            LabelledDocument document = unClassifiedIterator.nextDocument();
-            INDArray documentAsCentroid = meansBuilder.documentAsVector(document);
-            List<Pair<String, Double>> scores = seeker.getScores(documentAsCentroid);
-
-         /*
-          please note, document.getLabel() is used just to show which document we're looking at now,
-          as a substitute for printing out the whole document name.
-          So, labels on these two documents are used like titles,
-          just to visualize our classification done properly
-         */
-            System.out.println("Document '" + document.getLabels() + "' falls into the following categories: ");
-            for (Pair<String, Double> score : scores) {
-                System.out.println("        " + score.getFirst() + ": " + score.getSecond());
-            }
-        }
-
-    }
     private void writeIndexToCsv(String csvFileName, Word2Vec model) {
 
         CSVWriter writer = null;

@@ -1,4 +1,4 @@
-package dl.classifier_vectors;
+package dl.paragraph;
 
 import org.deeplearning4j.models.embeddings.inmemory.InMemoryLookupTable;
 import org.deeplearning4j.models.word2vec.VocabWord;

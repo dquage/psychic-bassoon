@@ -31,10 +31,6 @@ public class Main {
     }
 
 
-
-
-
-
     public static void main_autre(String[] args) {
 
         try {

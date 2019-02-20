@@ -113,6 +113,7 @@ public class MyDataSetIterator extends AbstractDataSetIterator {
         // Feature (Libellés)
         Writable currentFeature = currList.get(featureIndex);
         String value = currentFeature.toString();
+        value = preProcessor.preProcess(value);
 //        if (model instanceof LibelleWord2Vec) {
 //            value = preProcessor.preProcess(value);
 //            LibelleWord2Vec libelleWord2Vec = (LibelleWord2Vec) model;
