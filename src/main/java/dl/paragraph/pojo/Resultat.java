@@ -10,18 +10,22 @@ import lombok.Data;
 @Builder
 public class Resultat {
 
+    private Record record;
     private String libelle;
-    private String labelExpected;
     private Categorie categorie1;
     private Categorie categorie2;
     private Categorie categorie3;
     private String labelAccepted;
 
+    public String getLabelExpected() {
+        return record != null ? record.getCategorie() : null;
+    }
+
     public boolean isAccurate() {
-        return labelExpected != null && categorie1 != null && labelExpected.equals(categorie1.getLabel());
+        return getLabelExpected() != null && categorie1 != null && getLabelExpected().equals(categorie1.getLabel());
     }
 
     public boolean isAccurateLabelAccepted() {
-        return labelExpected != null && labelAccepted != null && labelExpected.equals(labelAccepted);
+        return getLabelExpected() != null && labelAccepted != null && getLabelExpected().equals(labelAccepted);
     }
 }

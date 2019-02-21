@@ -4,7 +4,11 @@ import com.google.common.base.Stopwatch;
 import com.google.common.collect.Lists;
 import dl.paragraph.acceptance.AcceptanceComparative;
 import dl.paragraph.acceptance.AcceptanceType;
+import dl.paragraph.my.MySentenceFromListIterator;
+import dl.paragraph.my.MySentenceIterator;
+import dl.paragraph.my.MySentenceIteratorConverter;
 import dl.paragraph.pojo.Categorie;
+import dl.paragraph.pojo.Record;
 import dl.paragraph.pojo.Resultat;
 import org.datavec.api.records.reader.RecordReader;
 import org.datavec.api.records.reader.impl.csv.CSVRecordReader;
@@ -12,6 +16,7 @@ import org.datavec.api.split.FileSplit;
 import org.datavec.api.transform.TransformProcess;
 import org.datavec.api.transform.schema.Schema;
 import org.datavec.api.util.ClassPathResource;
+import org.datavec.api.writable.Writable;
 import org.datavec.local.transforms.LocalTransformProcessRecordReader;
 import org.deeplearning4j.models.embeddings.inmemory.InMemoryLookupTable;
 import org.deeplearning4j.models.embeddings.loader.WordVectorSerializer;
@@ -77,13 +82,13 @@ public class Categorisation {
         saveModel(paragraphVectors);
     }
 
-    public void evaluate() throws IOException, InterruptedException {
+    public void evaluate(List<Record> records) throws IOException, InterruptedException {
 
         if (paragraphVectors == null) {
             paragraphVectors = readModelFromFile();
         }
 
-        LabelAwareIterator iterator = readCSVDataset("depenses2017.test", avecMontant);
+        LabelAwareIterator iterator = readDataForEvaluation(records);
 
         TokenizerFactory tokenizerFactory = new DefaultTokenizerFactory();
         tokenizerFactory.setTokenPreProcessor(new CommonPreprocessor());
@@ -119,6 +124,8 @@ public class Categorisation {
         while (iterator.hasNextDocument()) {
 
             LabelledDocument document = iterator.nextDocument();
+            Record record = ((MySentenceIteratorConverter) iterator).record();
+
             INDArray documentAsCentroid = meansBuilder.documentAsVector(document);
             List<Pair<String, Double>> scores = seeker.getScores(documentAsCentroid);
 
@@ -128,7 +135,7 @@ public class Categorisation {
 
             Resultat resultat = Resultat.builder()
                     .libelle(document.getContent())
-                    .labelExpected(document.getLabels().get(0))
+                    .record(record)
                     .categorie1(Categorie.builder().label(score1.getFirst()).score(score1.getSecond()).build())
                     .categorie2(Categorie.builder().label(score2.getFirst()).score(score2.getSecond()).build())
                     .categorie3(Categorie.builder().label(score3.getFirst()).score(score3.getSecond()).build())
@@ -169,7 +176,7 @@ public class Categorisation {
      * @throws IOException
      * @throws InterruptedException
      */
-    private static LabelAwareIterator readCSVDataset(String csvFileClasspath, boolean avecMontant) throws IOException, InterruptedException {
+    public static LabelAwareIterator readCSVDataset(String csvFileClasspath, boolean avecMontant) throws IOException, InterruptedException {
 
         Schema inputDataSchema = new Schema.Builder()
 //                .addColumnsString("id", "numcba", "montant", "libele", "numcompte", "categorie")
@@ -192,7 +199,6 @@ public class Categorisation {
         LabelsSource labelsSource = new LabelsSource(getCategories(transformProcessRecordReader)); // On passe la liste des catégories de chaque libellé ordonnée
         MySentenceIterator iterator = new MySentenceIterator(transformProcessRecordReader, avecMontant);
         LabelAwareIterator myDataSetIterator = new SentenceIteratorConverter(iterator, labelsSource);
-
 //        myDataSetIterator.setCollectMetaData(true);
         return myDataSetIterator;
     }
@@ -204,5 +210,60 @@ public class Categorisation {
         }
         transformProcessRecordReader.reset();
         return categories;
+    }
+
+    public static List<Record> readCSVRecordsTest(String csvFileClasspath) throws IOException, InterruptedException {
+
+        Schema inputDataSchema = new Schema.Builder()
+                .addColumnsString("Id", "NumCba")
+                .addColumnDouble("Montant")
+                .addColumnsString("Libelle", "LibelleSimple")
+                .addColumnCategorical("Categorie", Arrays.asList(CATEGORIES))
+                .build();
+
+        TransformProcess tp = new TransformProcess.Builder(inputDataSchema)
+                .removeColumns("Id", "NumCba", "LibelleSimple")
+                .build();
+
+        RecordReader rr = new CSVRecordReader();
+        rr.initialize(new FileSplit(new ClassPathResource(csvFileClasspath).getFile()));
+        LocalTransformProcessRecordReader transformProcessRecordReader = new LocalTransformProcessRecordReader(rr, tp);
+
+        List<Record> records = Lists.newArrayList();
+        while (transformProcessRecordReader.hasNext()) {
+            List<Writable> next = transformProcessRecordReader.next();
+            records.add(Record.builder().categorie(next.get(2).toString()).libelle(next.get(1).toString()).montant(next.get(0).toDouble()).build());
+        }
+        return records;
+    }
+
+    public static List<Record> readCSVRecordsReels(String csvFileClasspath) throws IOException, InterruptedException {
+
+        Schema inputDataSchema = new Schema.Builder()
+                .addColumnsString("Id", "NumCba")
+                .addColumnDouble("Montant")
+                .addColumnsString("Libelle", "LibelleSimple")
+                .build();
+
+        TransformProcess tp = new TransformProcess.Builder(inputDataSchema)
+                .removeColumns("Id", "NumCba")
+                .build();
+
+        RecordReader rr = new CSVRecordReader();
+        rr.initialize(new FileSplit(new ClassPathResource(csvFileClasspath).getFile()));
+        LocalTransformProcessRecordReader transformProcessRecordReader = new LocalTransformProcessRecordReader(rr, tp);
+
+        List<Record> records = Lists.newArrayList();
+        while (transformProcessRecordReader.hasNext()) {
+            List<Writable> next = transformProcessRecordReader.next();
+            records.add(Record.builder().libelle(next.get(1).toString()).montant(next.get(0).toDouble()).build());
+        }
+        return records;
+    }
+
+    private static LabelAwareIterator readDataForEvaluation(List<Record> records) {
+
+        MySentenceFromListIterator iterator = new MySentenceFromListIterator(records);
+        return new MySentenceIteratorConverter(iterator);
     }
 }

@@ -18,7 +18,8 @@ public class MainParagraph {
         try {
             Categorisation categorisation = new Categorisation();
 //            categorisation.train();
-            categorisation.evaluate();
+            categorisation.evaluate(Categorisation.readCSVRecordsTest("depenses2017.test"));
+//            categorisation.evaluate(Categorisation.readCSVRecordsReels("julien.test"));
         } catch (Exception e) {
             System.out.println("****************Example finished WITH ERROR ********************");
             e.printStackTrace();

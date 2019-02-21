@@ -162,7 +162,11 @@ public class Tracing {
         for (Resultat resultat : resultats) {
             sb.append(resultat.getLibelle());
             sb.append("\n");
-            sb.append("[EXPC][").append(resultat.getLabelExpected()).append("]");
+            sb.append("[RETENU][").append(resultat.getLabelAccepted()).append("]");
+            if (resultat.getLabelExpected() != null) {
+                sb.append("\n");
+                sb.append("[EXPC][").append(resultat.getLabelExpected()).append("]");
+            }
             sb.append("\n");
             sb.append("[").append(resultat.getCategorie1().getScoreArrondi()).append("][").append(resultat.getCategorie1().getLabel()).append("]");
             sb.append("\t");
