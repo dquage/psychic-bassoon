@@ -11,9 +11,11 @@ public class MySentenceIterator implements SentenceIterator {
 
     private RecordReader recordReader;
     private SentencePreProcessor sentencePreProcessor;
+    private boolean avecMontant;
 
-    public MySentenceIterator(RecordReader recordReader) {
+    public MySentenceIterator(RecordReader recordReader, boolean avecMontant) {
         this.recordReader = recordReader;
+        this.avecMontant = avecMontant;
     }
 
     @Override
@@ -23,8 +25,10 @@ public class MySentenceIterator implements SentenceIterator {
             return null;
         }
         List<Writable> next = recordReader.next();
-        Writable writable = next.get(0);
-        return writable != null ? writable.toString() : null;
+        if (avecMontant) {
+            return next.get(1).toString() + " " + next.get(0).toString();
+        }
+        return next.get(1).toString();
     }
 
     @Override

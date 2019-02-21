@@ -17,7 +17,7 @@ public class MainParagraph {
         setJavaLogger(Level.INFO);
         try {
             Categorisation categorisation = new Categorisation();
-            categorisation.train();
+//            categorisation.train();
             categorisation.evaluate();
         } catch (Exception e) {
             System.out.println("****************Example finished WITH ERROR ********************");
