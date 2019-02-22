@@ -46,6 +46,7 @@ public class Tracing {
         int nbItems = resultats.size();
         int nbItemsAccurates = 0;
         int nbItemsAcceptedAccurates = 0;
+        int nbItemsAcceptedInaccurates = 0;
         double scores1Sum = 0;
         double scores1AccurateSum = 0;
 
@@ -102,6 +103,10 @@ public class Tracing {
 
             if (resultat.isAccurateLabelAccepted()) {
                 nbItemsAcceptedAccurates++;
+            } else {
+                if (resultat.getLabelExpected() != null) {
+                    nbItemsAcceptedInaccurates++;
+                }
             }
         }
 
@@ -110,6 +115,7 @@ public class Tracing {
 
         String tauxJustesse = nbItems > 0 ? String.format("%2.2f", (((double) nbItemsAccurates * 100) / nbItems)) : "0";
         String tauxJustesseAccepted = nbItems > 0 ? String.format("%2.2f", (((double) nbItemsAcceptedAccurates * 100) / nbItems)) : "0";
+        String tauxErreurAccepted = nbItems > 0 ? String.format("%2.2f", (((double) nbItemsAcceptedInaccurates * 100) / nbItems)) : "0";
         String tauxJustesse80min = nbItemsPrecision80minSum > 0 ? String.format("%2.2f", (nbItemsAccuratePrecision80minSum * 100 / nbItemsPrecision80minSum)) : "0";
         String tauxJustesse70min = nbItemsPrecision70minSum > 0 ? String.format("%2.2f", (nbItemsAccuratePrecision70minSum * 100 / nbItemsPrecision70minSum)) : "0";
         String tauxJustesse60min = nbItemsPrecision60minSum > 0 ? String.format("%2.2f", (nbItemsAccuratePrecision60minSum * 100 / nbItemsPrecision60minSum)) : "0";
@@ -118,7 +124,8 @@ public class Tracing {
         String tauxJustesse30min = nbItemsPrecision30minSum > 0 ? String.format("%2.2f", (nbItemsAccuratePrecision30minSum * 100 / nbItemsPrecision30minSum)) : "0";
 
         System.out.println("Nombre éléments catégorisés avec succès : " + nbItemsAccurates + " donc " + tauxJustesse + "%");
-        System.out.println("Nombre éléments acceptés catégorisés avec succès : " + nbItemsAcceptedAccurates + " donc " + tauxJustesseAccepted + "%");
+        System.out.println("Nombre éléments acceptés catégorisés avec SUCCES : " + nbItemsAcceptedAccurates + " donc " + tauxJustesseAccepted + "%");
+        System.out.println("Nombre éléments acceptés catégorisés en   ERREUR : " + nbItemsAcceptedInaccurates + " donc " + tauxErreurAccepted + "%");
 
 
         StringBuilder sb = new StringBuilder();
@@ -130,6 +137,8 @@ public class Tracing {
         sb.append("Nombre éléments catégorisés avec succès : ").append(nbItemsAccurates).append(" donc ").append(tauxJustesse).append("%");
         sb.append("\n");
         sb.append("Nombre éléments acceptés catégorisés avec succès : ").append(nbItemsAcceptedAccurates).append(" donc ").append(tauxJustesseAccepted).append("%");
+        sb.append("\n");
+        sb.append("Nombre éléments acceptés catégorisés avec erreur : ").append(nbItemsAcceptedInaccurates).append(" donc ").append(tauxErreurAccepted).append("%");
         sb.append("\n");
         sb.append("\n");
         sb.append("Moyenne de la précision de la meilleure catégorie trouvée : ").append(moyenneScores1All).append("%");
@@ -160,9 +169,18 @@ public class Tracing {
         sb.append("\n");
 
         for (Resultat resultat : resultats) {
+            if (resultat.getRecord() != null) {
+                sb.append(resultat.getRecord().isRecette() ? "[RECETTE]" : "[DEPENSE]");
+                sb.append(" ").append(resultat.getRecord().getMontant()).append("€ | ");
+            }
             sb.append(resultat.getLibelle());
-            sb.append("\n");
-            sb.append("[RETENU][").append(resultat.getLabelAccepted()).append("]");
+            if (resultat.getLabelAccepted() != null) {
+                sb.append("\n");
+                sb.append("[RETENU][").append(resultat.getLabelAccepted()).append("]");
+                if (resultat.getLabelExpected() != null && !resultat.isAccurateLabelAccepted()) {
+                    sb.append("[ERREUR]");
+                }
+            }
             if (resultat.getLabelExpected() != null) {
                 sb.append("\n");
                 sb.append("[EXPC][").append(resultat.getLabelExpected()).append("]");

@@ -39,6 +39,10 @@ public class AcceptanceType implements Acceptance {
                 return new TypeAssurance().accept(resultat);
             case TypeDetermination.DAB:
                 return new TypeDab().accept(resultat);
+            case TypeDetermination.CPAM:
+                return new TypeHonoraires().accept(resultat);
+            case TypeDetermination.MUTUELLE:
+                return new TypeHonoraires().accept(resultat);
         }
         return null;
     }

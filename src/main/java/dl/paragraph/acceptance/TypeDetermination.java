@@ -9,6 +9,8 @@ public class TypeDetermination {
     public static final String CARPIMKO = "CARPIMKO";
     public static final String TRANSPORTS = "TRANSPORTS";
     public static final String DAB = "DAB";
+    public static final String CPAM = "CPAM";
+    public static final String MUTUELLE = "MUTUELLE";
 
     public static String determineType(String libelle) {
 
@@ -27,6 +29,10 @@ public class TypeDetermination {
             return TRANSPORTS;
         } else if (isDab(libnorm)) {
             return DAB;
+        } else if (isCpam(libnorm)) {
+            return CPAM;
+        } else if (isMutuelle(libnorm)) {
+            return MUTUELLE;
         }
         return null;
     }
@@ -57,5 +63,13 @@ public class TypeDetermination {
 
     private static boolean isDab(String libelle) {
         return libelle.contains("dab") || libelle.contains("retrait");
+    }
+
+    private static boolean isCpam(String libelle) {
+        return libelle.contains("cpam");
+    }
+
+    private static boolean isMutuelle(String libelle) {
+        return libelle.contains("mutuelle");
     }
 }

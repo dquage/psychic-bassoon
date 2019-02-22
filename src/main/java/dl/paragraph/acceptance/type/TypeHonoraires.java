@@ -4,15 +4,15 @@ import dl.paragraph.acceptance.Acceptance;
 import dl.paragraph.pojo.Record;
 import dl.paragraph.pojo.Resultat;
 
-public class TypeCba implements Acceptance {
+public class TypeHonoraires implements Acceptance {
 
-    public static final String CATEG_1 = "ENTRETIEN_ET_REPARATIONS";
-    public static final String CATEG_2 = "LOCATION_LD_AUTRE_QUE_VEHICULE";
+    public static final String CATEG_1 = "HONORAIRES";
 
     @Override
     public String accept(Resultat resultat) {
+
         Record record = resultat.getRecord();
-        if (record != null && record.isDepense()) {
+        if (record != null && record.isRecette()) {
             return CATEG_1;
         }
         return null;

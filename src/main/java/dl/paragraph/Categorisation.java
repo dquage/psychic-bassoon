@@ -77,7 +77,7 @@ public class Categorisation {
         System.out.println("Train starting...");
         Stopwatch started = Stopwatch.createStarted();
         paragraphVectors.fit();
-        System.out.println("Train done In " + started.stop().elapsed(TimeUnit.SECONDS) + "s");
+        System.out.println("Train done in " + started.stop().elapsed(TimeUnit.SECONDS) + "s");
 
         saveModel(paragraphVectors);
     }
@@ -145,7 +145,7 @@ public class Categorisation {
 
             resultats.add(resultat);
         }
-        System.out.println("Evaluation done In " + started.stop().elapsed(TimeUnit.SECONDS) + "s");
+        System.out.println("Evaluation done in " + started.stop().elapsed(TimeUnit.SECONDS) + "s");
 
         Tracing.saveResultats(resultats);
         Tracing.saveResultatsParCategorie(resultats);

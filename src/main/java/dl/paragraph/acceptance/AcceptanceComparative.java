@@ -10,16 +10,20 @@ import dl.paragraph.pojo.Resultat;
 public class AcceptanceComparative implements Acceptance {
 
     private int precisionAccepte = 80;
-    private int precisionMin = 60;
-    private int palier = 40;
+    private int precisionMin1 = 60;
+    private int palier1 = 40;
+    private int precisionMin2 = 40;
+    private int palier2 = 20;
 
     public AcceptanceComparative() {
     }
 
-    public AcceptanceComparative(int precisionAccepte, int precisionMin, int palier) {
+    public AcceptanceComparative(int precisionAccepte, int precisionMin1, int palier1, int precisionMin2, int palier2) {
         this.precisionAccepte = precisionAccepte;
-        this.precisionMin = precisionMin;
-        this.palier = palier;
+        this.precisionMin1 = precisionMin1;
+        this.palier1 = palier1;
+        this.precisionMin2 = precisionMin2;
+        this.palier2 = palier2;
     }
 
     @Override
@@ -30,7 +34,8 @@ public class AcceptanceComparative implements Acceptance {
         double score3 = resultat.getCategorie3().getScore() * 100;
 
         boolean accepte = (score1 > precisionAccepte)
-                || (score1 > precisionMin && score2 < palier && score3 < palier);
+                || (score1 > precisionMin1 && score2 < palier1 && score3 < palier1)
+                || (score1 > precisionMin2 && score2 < palier2 && score3 < palier2);
 
         return accepte ? resultat.getCategorie1().getLabel() : null;
     }
