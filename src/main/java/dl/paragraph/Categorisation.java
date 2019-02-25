@@ -183,8 +183,7 @@ public class Categorisation {
                 //Or for convenience define multiple columns of the same type
                 .addColumnsString("Id", "NumCba")
                 .addColumnDouble("Montant")
-                .addColumnsString("Libelle", "NumCompte")
-                .addColumnCategorical("Categorie", Arrays.asList(CATEGORIES))
+                .addColumnsString("Libelle", "LibelleSimple", "Categorie")
                 .build();
 
         // Permet de conditionner, transformer, enlever les data que l'on récupère du CSV
@@ -217,8 +216,7 @@ public class Categorisation {
         Schema inputDataSchema = new Schema.Builder()
                 .addColumnsString("Id", "NumCba")
                 .addColumnDouble("Montant")
-                .addColumnsString("Libelle", "LibelleSimple")
-                .addColumnCategorical("Categorie", Arrays.asList(CATEGORIES))
+                .addColumnsString("Libelle", "LibelleSimple", "Categorie")
                 .build();
 
         TransformProcess tp = new TransformProcess.Builder(inputDataSchema)

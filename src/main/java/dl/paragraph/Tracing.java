@@ -104,7 +104,7 @@ public class Tracing {
             if (resultat.isAccurateLabelAccepted()) {
                 nbItemsAcceptedAccurates++;
             } else {
-                if (resultat.getLabelExpected() != null) {
+                if (resultat.getLabelExpected() != null && resultat.getLabelAccepted() != null) {
                     nbItemsAcceptedInaccurates++;
                 }
             }
