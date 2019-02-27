@@ -45,7 +45,7 @@ public class Categorisation {
             "CHARGES_DIVERSES_DE_GESTION_COURANTE", "REPAS_DE_MIDI", "ENTRETIEN_ET_REPARATIONS", "DEPENSES_VEHICULE",
             "EMPRUNT", "COTISATIONS_COMPLEMENTAIRES_EXPLOITANT", "CHARGES_FINANCIERES", "ASSURANCE_VEHICULE", "FRAIS_DE_TELECOMMUNICATION",
             "HONORAIRES_RETROCEDES", "FOURNITURES_DE_BUREAU_ET_ADMINISTRATIVES", "PETIT_OUTILLAGE_PETIT_MATERIEL", "ASSURANCES",
-            "COTISATIONS_PROF_ET_SYNDICALE", "FRAIS_POSTAUX", "CFE_CVAE", "ACHATS_A_USAGE_UNIQUE", "TRANSPORTS_DIVERS__BUS_TAXIS_",
+            "COTISATIONS_PROF_ET_SYNDICALE", "FRAIS_POSTAUX", "CFE_CVAE", "ACHATS_A_USAGE_UNIQUE", "TRANSPORTS_DIVERS_BUS_TAXIS",
             "HONORAIRES_RETROCEDES_A_REMPLACANT", "CADEAUX_CLIENTELE", "COTISATION_CARPIMKO", "FRAIS_DE_FORMATION_SEMINAIRE",
             "CHEQUES_VACANCES", "FRAIS_DE_DOCUMENTATION_TECHNIQUE", "LOCATIONS_IMMOBILIERES", "LLD_VEHICULE", "AUTRES_SERVICES_EXTERIEURS_HONORAIRES",
             "HONORAIRES", "AGIOS_BANCAIRES", "PRESTATIONS_DE_SERVICE", "COTISATIONS_MALADIE_EXPLOITANT",
@@ -129,19 +129,28 @@ public class Categorisation {
             INDArray documentAsCentroid = meansBuilder.documentAsVector(document);
             List<Pair<String, Double>> scores = seeker.getScores(documentAsCentroid);
 
-            Pair<String, Double> score1 = scores.get(0);
-            Pair<String, Double> score2 = scores.get(1);
-            Pair<String, Double> score3 = scores.get(2);
-
-            Resultat resultat = Resultat.builder()
-                    .libelle(document.getContent())
-                    .record(record)
-                    .categorie1(Categorie.builder().label(score1.getFirst()).score(score1.getSecond()).build())
-                    .categorie2(Categorie.builder().label(score2.getFirst()).score(score2.getSecond()).build())
-                    .categorie3(Categorie.builder().label(score3.getFirst()).score(score3.getSecond()).build())
-                    .build();
-
-            resultat.setLabelAccepted(acceptanceType.accept(resultat));
+            Resultat resultat = null;
+            if (scores != null) {
+                Pair<String, Double> score1 = scores.get(0);
+                Pair<String, Double> score2 = scores.get(1);
+                Pair<String, Double> score3 = scores.get(2);
+                resultat = Resultat.builder()
+                        .libelle(document.getContent())
+                        .record(record)
+                        .categorie1(Categorie.builder().label(score1.getFirst()).score(score1.getSecond()).build())
+                        .categorie2(Categorie.builder().label(score2.getFirst()).score(score2.getSecond()).build())
+                        .categorie3(Categorie.builder().label(score3.getFirst()).score(score3.getSecond()).build())
+                        .build();
+                resultat.setLabelAccepted(acceptanceType.accept(resultat));
+            } else {
+                resultat = Resultat.builder()
+                        .libelle(document.getContent())
+                        .record(record)
+                        .categorie1(null)
+                        .categorie2(null)
+                        .categorie3(null)
+                        .build();
+            }
 
             resultats.add(resultat);
         }

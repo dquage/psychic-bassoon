@@ -35,6 +35,10 @@ public class LabelSeeker {
      */
     public List<Pair<String, Double>> getScores(INDArray vector) {
 
+        if (vector == null) {
+            return null;
+        }
+
         List<Pair<String, Double>> result = new ArrayList<>();
         Counter<String> distances = new Counter<>();
 

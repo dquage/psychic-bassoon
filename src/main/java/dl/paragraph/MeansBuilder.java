@@ -45,6 +45,10 @@ public class MeansBuilder {
         for (String word: documentAsTokens) {
             if (vocabCache.containsWord(word)) cnt.incrementAndGet();
         }
+
+        if (cnt.get() == 0) {
+            return null;
+        }
         INDArray allWords = Nd4j.create(cnt.get(), lookupTable.layerSize());
 
         cnt.set(0);

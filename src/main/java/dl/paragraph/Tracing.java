@@ -43,6 +43,7 @@ public class Tracing {
     public static void saveResultats(List<Resultat> resultats) throws IOException {
 
         // Stats accuracy
+        int nbItemsNonCategorises = 0;
         int nbItems = resultats.size();
         int nbItemsAccurates = 0;
         int nbItemsAcceptedAccurates = 0;
@@ -65,6 +66,12 @@ public class Tracing {
         double nbItemsAccuratePrecision30minSum = 0;
 
         for (Resultat resultat : resultats) {
+
+            if (resultat.getCategorie1() == null) {
+                nbItemsNonCategorises++;
+                continue;
+            }
+
             double score = resultat.getCategorie1().getScore() * 100;
             scores1Sum += score;
 
@@ -185,12 +192,21 @@ public class Tracing {
                 sb.append("\n");
                 sb.append("[EXPC][").append(resultat.getLabelExpected()).append("]");
             }
-            sb.append("\n");
-            sb.append("[").append(resultat.getCategorie1().getScoreArrondi()).append("][").append(resultat.getCategorie1().getLabel()).append("]");
-            sb.append("\t");
-            sb.append("[").append(resultat.getCategorie2().getScoreArrondi()).append("][").append(resultat.getCategorie2().getLabel()).append("]");
-            sb.append("\t");
-            sb.append("[").append(resultat.getCategorie3().getScoreArrondi()).append("][").append(resultat.getCategorie3().getLabel()).append("]");
+            if (resultat.getCategorie1() != null) {
+                sb.append("\n");
+                sb.append("[").append(resultat.getCategorie1().getScoreArrondi()).append("][").append(resultat.getCategorie1().getLabel()).append("]");
+            } else {
+                sb.append("\n");
+                sb.append("NON CATEGORISE");
+            }
+            if (resultat.getCategorie2() != null) {
+                sb.append("\t");
+                sb.append("[").append(resultat.getCategorie2().getScoreArrondi()).append("][").append(resultat.getCategorie2().getLabel()).append("]");
+            }
+            if (resultat.getCategorie3() != null) {
+                sb.append("\t");
+                sb.append("[").append(resultat.getCategorie3().getScoreArrondi()).append("][").append(resultat.getCategorie3().getLabel()).append("]");
+            }
             sb.append("\n");
             sb.append("\n");
         }

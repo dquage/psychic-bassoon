@@ -1,6 +1,8 @@
 package dl;
 
+import com.google.common.collect.Lists;
 import dl.paragraph.Categorisation;
+import dl.paragraph.pojo.Record;
 
 import java.util.logging.Handler;
 import java.util.logging.Level;
@@ -18,8 +20,11 @@ public class MainParagraph {
         try {
             Categorisation categorisation = new Categorisation();
 //            categorisation.train();
-            categorisation.evaluate(Categorisation.readCSVRecordsTest("depenses2017.test"));
+//            categorisation.evaluate(Categorisation.readCSVRecordsTest("depenses2017.test"));
 //            categorisation.evaluate(Categorisation.readCSVRecordsReels("julien.test"));
+            categorisation.evaluate(Lists.newArrayList(Record.builder().montant(22L).libelle("virements").build()));
+
+
         } catch (Exception e) {
             System.out.println("****************Example finished WITH ERROR ********************");
             e.printStackTrace();
