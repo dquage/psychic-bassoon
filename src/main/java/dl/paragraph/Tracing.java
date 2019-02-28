@@ -227,7 +227,7 @@ public class Tracing {
             List<String> libelles = Lists.newArrayList();
             categs.put(category, libelles);
             for (Resultat resultat : resultats) {
-                if (resultat.getCategorie1().getLabel().equals(category)) {
+                if (resultat.getCategorie1() != null && resultat.getCategorie1().getLabel().equals(category)) {
                     libelles.add(resultat.getLibelle());
                 }
             }
@@ -240,7 +240,7 @@ public class Tracing {
             sb.append("\n");
             sb.append("\n");
             for (Resultat resultat : resultats) {
-                if (resultat.getCategorie1().getLabel().equals(category)) {
+                if (resultat.getCategorie1() != null && resultat.getCategorie1().getLabel().equals(category)) {
                     sb.append("[").append(resultat.getCategorie1().getScoreArrondi()).append("] ");
                     sb.append(resultat.getLibelle());
                     sb.append("\n");

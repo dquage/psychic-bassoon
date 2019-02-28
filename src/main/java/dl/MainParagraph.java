@@ -21,16 +21,22 @@ public class MainParagraph {
         setJavaLogger(Level.INFO);
         try {
 
-//            CSVRetouches.normaliseDataset("apollon_data_2018.csv");
-//            CSVRetouches.createTrainDataset("apollon_data_2018.normalise.csv", 85);
-//            List<String> categories = CSVRetouches.readAllCategories("apollon_data_2018.csv");
+            // Permet de normaliser le jeux complet de données (vire des libellés non concluants, normalise un peu les libellés...)
+//            CSVRetouches.normaliseDataset("donnees/apollon_data_2018.csv");
+            // Sépare le jeux de données complet en 1 jeu de train, 1 jeu de test à 90%
+//            CSVRetouches.createTrainDataset("apollon_data_2018.normalise.csv", 90);
 
             Categorisation categorisation = new Categorisation();
+            // Entrainement et création du modèle (long)
             categorisation.train();
+            // Evaluation du jeu de test
             categorisation.evaluate();
 
+            // Autre tests
 //            categorisation.evaluate(Categorisation.readCSVRecordsReels("julien.test"));
 //            categorisation.evaluate(Lists.newArrayList(Record.builder().montant(22L).libelle("OD de balance d'ouverture").build()));
+            // Affiche juste la liste de toutes les catégories
+//            List<String> categories = CSVRetouches.readAllCategories("apollon_data_2018.csv");
 
 
         } catch (Exception e) {

@@ -1,5 +1,6 @@
 package dl.paragraph.pojo;
 
+import com.sun.istack.internal.NotNull;
 import lombok.Builder;
 import lombok.Data;
 
@@ -7,12 +8,25 @@ import lombok.Data;
 @Builder
 public class Record {
 
+    public enum Type {
+        RECETTE, DEPENSE;
+        public static Type fromString(String str) {
+            return str.equals("RECETTE") ? RECETTE : DEPENSE;
+        }
+    }
+
+    private Type type = Type.DEPENSE;
+    private Apollon apollon;
     private String categorie;
+    private String numeroCompte;
+
+    @NotNull
     private String libelle;
+    @NotNull
     private double montant;
 
     public boolean isRecette() {
-        return montant >= 0;
+        return type == Type.RECETTE;
     }
 
     public boolean isDepense() {

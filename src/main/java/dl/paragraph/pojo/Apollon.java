@@ -1,6 +1,9 @@
 package dl.paragraph.pojo;
 
 import com.fasterxml.jackson.annotation.JsonValue;
+import com.google.common.collect.Lists;
+
+import java.util.List;
 
 public enum Apollon {
 
@@ -26,6 +29,7 @@ public enum Apollon {
     PERTE_EMPLOI_MADELIN("PERTE EMPLOI MADELIN", "6464030"),
 
     COMPTE_ATTENTE("COMPTE D ATTENTE", "4710000"),
+    COMPTE_ATTENTE_IMMOBILISATIONS("COMPTE DATTENTE DES IMMOBILISATIONS", "4720000"),
     COMPTE_DE_L_EXPLOITANT("COMPTE DE L EXPLOITANT", "1080000"),
     APPORT_PERSONNEL("APPORT PERSONNEL", "1080100"),
     COMPTE_ASSOCIE("COMPTE ASSOCIE", "4550000"),
@@ -106,8 +110,6 @@ public enum Apollon {
     LOCATION_LD_AUTRE_QUE_VEHICULE("LOCATION LD AUTRE QUE VEHICULE", "6135010"), // LOCATION LD AUTRE QUE VÉHICULE
     FRAIS_D_ACTES_ET_DE_CONTENTIEUX("FRAIS D ACTES ET DE CONTENTIEUX", "6227000"),
 
-
-    FOURNISSEURS_D_IMMOBILISATIONS("FOURNISSEURS D IMMOBILISATIONS", "4720000"),
     PRODUIT_CESSION_IMMOBILISATION("PRODUIT DE CESSION D IMMOBILISATION", "7750000"),
 
     IMMOBILISATIONS_INCORPORELLES("IMMOBILISATIONS INCORPORELLES", "2000000"),
@@ -176,6 +178,18 @@ public enum Apollon {
             }
         }
         return null;
+    }
+
+    /**
+     * Liste de tous les labels.
+     * @return
+     */
+    public static List<String> labels() {
+        List<String> labels = Lists.newArrayList();
+        for (Apollon o : Apollon.values()) {
+            labels.add(o.label);
+        }
+        return labels;
     }
 
     @JsonValue

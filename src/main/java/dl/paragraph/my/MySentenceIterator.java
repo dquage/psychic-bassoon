@@ -12,10 +12,12 @@ public class MySentenceIterator implements SentenceIterator {
     private RecordReader recordReader;
     private SentencePreProcessor sentencePreProcessor;
     private boolean avecMontant;
+    private boolean avecType;
 
-    public MySentenceIterator(RecordReader recordReader, boolean avecMontant) {
+    public MySentenceIterator(RecordReader recordReader, boolean avecMontant, boolean avecType) {
         this.recordReader = recordReader;
         this.avecMontant = avecMontant;
+        this.avecType = avecType;
     }
 
     @Override
@@ -25,10 +27,19 @@ public class MySentenceIterator implements SentenceIterator {
             return null;
         }
         List<Writable> next = recordReader.next();
-        if (avecMontant) {
-            return next.get(1).toString() + " " + next.get(2).toString();
+
+        String libelle = next.get(1).toString();
+        String montant = next.get(2).toString();
+        String type = next.get(4).toString();
+
+        if (avecMontant && avecType) {
+            return libelle + " " + type + " " + montant;
+        } else if (avecMontant) {
+            return libelle + " " + montant;
+        } else if (avecType) {
+            return libelle + " " + type;
         }
-        return next.get(1).toString();
+        return libelle;
     }
 
     @Override
