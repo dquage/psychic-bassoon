@@ -238,7 +238,9 @@ public class CSVRetouches {
             String cat = next.get(0).toString();
             String libelle = next.get(1).toString();
             String montant = next.get(2).toString();
-            String ligne = "\"" + cat + "\",\"" + libelle + "\",\"" + montant + "\"";
+            String compte = next.get(3).toString();
+            String type = next.get(4).toString();
+            String ligne = "\"" + cat + "\",\"" + libelle + "\",\"" + montant + "\",\"" + compte + "\",\"" + type + "\"";
             lignes.add(ligne);
         }
 
