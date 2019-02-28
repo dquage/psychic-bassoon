@@ -31,6 +31,8 @@ public class AcceptanceType implements Acceptance {
                 return new TypeEssence().accept(resultat);
             case TypeDetermination.CARPIMKO:
                 return new TypeCarpimko().accept(resultat);
+            case TypeDetermination.URSSAF:
+                return new TypeUrssaf().accept(resultat);
             case TypeDetermination.TELECOM:
                 return new TypeTelecom().accept(resultat);
             case TypeDetermination.TRANSPORTS:

@@ -7,6 +7,7 @@ public class TypeDetermination {
     public static final String ASSURANCE = "ASSURANCE";
     public static final String TELECOM = "TELECOM";
     public static final String CARPIMKO = "CARPIMKO";
+    public static final String URSSAF = "URSSAF";
     public static final String TRANSPORTS = "TRANSPORTS";
     public static final String DAB = "DAB";
     public static final String CPAM = "CPAM";
@@ -25,6 +26,8 @@ public class TypeDetermination {
             return TELECOM;
         } else if (isCarpimko(libnorm)) {
             return CARPIMKO;
+        } else if (isUrssaf(libnorm)) {
+            return URSSAF;
         } else if (isTransports(libnorm)) {
             return TRANSPORTS;
         } else if (isDab(libnorm)) {
@@ -53,8 +56,12 @@ public class TypeDetermination {
         return libelle.contains("free") || libelle.contains("bouygues") || libelle.contains("adsl") || libelle.contains("orange") || libelle.contains("sfr");
     }
 
+    public static boolean isUrssaf(String libelle) {
+        return libelle.contains("urssaf");
+    }
+
     public static boolean isCarpimko(String libelle) {
-        return libelle.contains("c a r p i m") || libelle.contains("carpimko");
+        return libelle.contains("c.a.r.p.i.m") || libelle.contains("carpimko");
     }
 
     public static boolean isTransports(String libelle) {

@@ -26,7 +26,7 @@ public class MySentenceIterator implements SentenceIterator {
         }
         List<Writable> next = recordReader.next();
         if (avecMontant) {
-            return next.get(1).toString() + " " + next.get(0).toString();
+            return next.get(1).toString() + " " + next.get(2).toString();
         }
         return next.get(1).toString();
     }

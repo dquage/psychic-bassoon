@@ -1,9 +1,11 @@
 package dl;
 
 import com.google.common.collect.Lists;
+import dl.paragraph.CSVRetouches;
 import dl.paragraph.Categorisation;
 import dl.paragraph.pojo.Record;
 
+import java.util.List;
 import java.util.logging.Handler;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -18,11 +20,17 @@ public class MainParagraph {
 
         setJavaLogger(Level.INFO);
         try {
+
+//            CSVRetouches.normaliseDataset("apollon_data_2018.csv");
+//            CSVRetouches.createTrainDataset("apollon_data_2018.normalise.csv", 85);
+//            List<String> categories = CSVRetouches.readAllCategories("apollon_data_2018.csv");
+
             Categorisation categorisation = new Categorisation();
-//            categorisation.train();
-//            categorisation.evaluate(Categorisation.readCSVRecordsTest("depenses2017.test"));
+            categorisation.train();
+            categorisation.evaluate();
+
 //            categorisation.evaluate(Categorisation.readCSVRecordsReels("julien.test"));
-            categorisation.evaluate(Lists.newArrayList(Record.builder().montant(22L).libelle("virements").build()));
+//            categorisation.evaluate(Lists.newArrayList(Record.builder().montant(22L).libelle("OD de balance d'ouverture").build()));
 
 
         } catch (Exception e) {
