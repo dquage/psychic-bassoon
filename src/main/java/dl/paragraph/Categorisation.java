@@ -270,13 +270,16 @@ public class Categorisation {
         return myDataSetIterator;
     }
 
+    /**
+     * Retourne la liste des catégories de tous les records.
+     * @param transformProcessRecordReader
+     * @return
+     */
     private static List<String> getCategories(LocalTransformProcessRecordReader transformProcessRecordReader) {
         List<String> categories = Lists.newArrayList();
         while (transformProcessRecordReader.hasNext()) {
             String cat = transformProcessRecordReader.next().get(2).toString();
-            if (!categories.contains(cat)) {
-                categories.add(cat);
-            }
+            categories.add(cat); // All with duplicates
         }
         transformProcessRecordReader.reset();
         return categories;
