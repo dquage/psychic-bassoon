@@ -1,10 +1,19 @@
 package dl;
 
 import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
 import dl.paragraph.CSVRetouches;
 import dl.paragraph.Categorisation;
+import dl.paragraph.CategorisationRNN;
+import dl.paragraph.pojo.Apollon;
 import dl.paragraph.pojo.Record;
+import org.nd4j.linalg.api.ndarray.INDArray;
+import org.nd4j.linalg.factory.Nd4j;
+import org.nd4j.linalg.primitives.Pair;
 
+import javax.naming.directory.Attributes;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.logging.Handler;
 import java.util.logging.Level;
@@ -26,11 +35,17 @@ public class MainParagraph {
             // Sépare le jeux de données complet en 1 jeu de train, 1 jeu de test à 90%
 //            CSVRetouches.createTrainDataset("apollon_data_2018.normalise.csv", 90);
 
-            Categorisation categorisation = new Categorisation();
-            // Entrainement et création du modèle (long)
-            categorisation.train();
-            // Evaluation du jeu de test
-            categorisation.evaluate();
+//            Categorisation categorisation = new Categorisation();
+//            // Entrainement et création du modèle (long)
+//            categorisation.train();
+//            // Evaluation du jeu de test
+//            categorisation.evaluate();
+
+            // Catégorisation RNN
+            CategorisationRNN categorisationRNN = new CategorisationRNN();
+            categorisationRNN.evaluate();
+
+
 
             // Autre tests
 //            categorisation.evaluate(Categorisation.readCSVRecordsReels("julien.test"));
