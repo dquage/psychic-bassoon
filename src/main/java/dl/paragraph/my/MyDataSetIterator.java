@@ -4,6 +4,7 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import dl.paragraph.pojo.Apollon;
 import dl.paragraph.pojo.Record;
+import org.deeplearning4j.iterator.CnnSentenceDataSetIterator;
 import org.deeplearning4j.models.embeddings.wordvectors.WordVectors;
 import org.deeplearning4j.text.tokenization.tokenizer.Tokenizer;
 import org.deeplearning4j.text.tokenization.tokenizer.preprocessor.CommonPreprocessor;
@@ -144,6 +145,7 @@ public class MyDataSetIterator implements DataSetIterator {
                 idxs[2] = NDArrayIndex.point(j);
                 String word = currSentence.get(j);
                 INDArray vector = wordVectors.getWordVectorMatrix(word);
+//                System.out.println(">>> >>> idxs [" + word + "] [" + idxs[0].current() + "][" + idxs[1].current() + "][" + idxs[2].current() + "]");
 //                System.out.println(">>> >>> Vector [" + word + "] [" + Arrays.toString(vector.shape()) + "] [" + vector.columns() + "] [" + vector.rows() + "]");
 //                INDArray vectorNormi = wordVectors.getWordVectorMatrixNormalized(word);
                 features.put(idxs, vector);

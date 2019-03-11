@@ -44,6 +44,7 @@ public class MainParagraph {
             // Catégorisation RNN
             CategorisationRNN categorisationRNN = new CategorisationRNN();
             categorisationRNN.evaluate();
+//            categorisationRNN.evaluateWithCnnSentenceDataSetIterator();
 
 
 

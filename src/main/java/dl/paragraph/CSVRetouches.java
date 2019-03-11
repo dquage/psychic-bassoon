@@ -272,7 +272,8 @@ public class CSVRetouches {
     private static boolean aRetirer(Apollon cat, String libelle) {
         return (libelle.contains("CHEQUE") && !libelle.contains("VIR"))
                 || (cat == Apollon.COMPTE_ATTENTE)
-                || (cat == Apollon.COMPTE_ATTENTE_IMMOBILISATIONS);
+                || (cat == Apollon.COMPTE_ATTENTE_IMMOBILISATIONS)
+                || (libelle.equals("AUCUN LIBELLÉ SPÉCIFIÉ POUR CETTE OPÉRATION"));
     }
 
     private static String adapteCategorie(String cat, String libelle, String compte) {
