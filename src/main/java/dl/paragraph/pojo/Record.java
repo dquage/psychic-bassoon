@@ -11,7 +11,12 @@ public class Record {
     public enum Type {
         RECETTE, DEPENSE;
         public static Type fromString(String str) {
-            return str.equals("RECETTE") ? RECETTE : DEPENSE;
+            return str.equals("R") ? RECETTE : DEPENSE;
+        }
+
+        @Override
+        public String toString() {
+            return this == RECETTE ? "R" : "D";
         }
     }
 

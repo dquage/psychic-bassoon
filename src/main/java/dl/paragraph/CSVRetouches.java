@@ -3,19 +3,19 @@ package dl.paragraph;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import dl.paragraph.pojo.Apollon;
+import dl.paragraph.pojo.LabelCount;
 import dl.paragraph.pojo.Record;
+import org.apache.commons.lang3.StringUtils;
 import org.datavec.api.records.reader.RecordReader;
 import org.datavec.api.records.reader.impl.csv.CSVRecordReader;
 import org.datavec.api.split.FileSplit;
 import org.datavec.api.transform.TransformProcess;
 import org.datavec.api.transform.schema.Schema;
-import org.datavec.api.util.ClassPathResource;
 import org.datavec.api.writable.Writable;
 import org.datavec.local.transforms.LocalTransformProcessRecordReader;
 import org.deeplearning4j.models.paragraphvectors.ParagraphVectors;
 
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.util.List;
@@ -89,6 +89,75 @@ public class CSVRetouches {
         System.out.println("");
         return categories;
     }
+
+    public static void verifyDataset(String csvFileClasspath) throws Exception {
+
+        LocalTransformProcessRecordReader transformProcessRecordReader = getNormalise(csvFileClasspath);
+        List<Record> records = Lists.newArrayList();
+        while (transformProcessRecordReader.hasNext()) {
+            List<Writable> next = transformProcessRecordReader.next();
+            String cat = next.get(0).toString();
+            String libelle = next.get(1).toString();
+            double montant = next.get(2).toDouble();
+            String compte = next.get(3).toString();
+            String type = next.get(4).toString();
+            Apollon apollon = Apollon.fromNumero(compte);
+            if (apollon == null) {
+                cat = adapteCategorie(cat, libelle, compte);
+                apollon = Apollon.fromLabel(cat);
+            }
+            records.add(Record.builder()
+                    .type(Record.Type.fromString(type))
+                    .apollon(apollon)
+                    .categorie(cat)
+                    .libelle(libelle)
+                    .numeroCompte(compte)
+                    .montant(montant)
+                    .build());
+        }
+
+        Map<String, List<LabelCount>> libsCategs = Maps.newHashMap();
+        for (Record record : records) {
+            List<LabelCount> apollons = libsCategs.get(record.getLibelle());
+            if (apollons == null) {
+                apollons = Lists.newArrayList(LabelCount.builder().apollon(record.getApollon()).count(1).build());
+                libsCategs.put(record.getLibelle(), apollons);
+            } else {
+                LabelCount labelCount = apollons.stream().filter(a -> a.apollon == record.getApollon()).findFirst().orElse(null);
+                if (labelCount != null) {
+                    labelCount.count++;
+                } else {
+                    apollons.add(LabelCount.builder().apollon(record.getApollon()).count(1).build());
+                }
+            }
+        }
+
+        int iter = 0;
+        int maxLabelFor1Libelle = 1;
+        int nbLibellesTotalImpacted = 0;
+        for (String lib : libsCategs.keySet()) {
+            List<LabelCount> apollonsCount = libsCategs.get(lib);
+            if (apollonsCount.size() > maxLabelFor1Libelle) {
+                maxLabelFor1Libelle = apollonsCount.size();
+            }
+            if (apollonsCount.size() > 1) {
+                System.out.println(++iter + " >> [" + lib + "] -> " + apollonsCount);
+
+                for (LabelCount labelCount : apollonsCount) {
+                    nbLibellesTotalImpacted += labelCount.count;
+                }
+
+
+            }
+        }
+
+        System.out.println("");
+        System.out.println("## MAX labels pour 1 libellé : " + maxLabelFor1Libelle);
+        System.out.println("## NB lignes de libellés total ayant plusieurs catégories : " + nbLibellesTotalImpacted);
+
+    }
+
+
 
     /**
      * A partir des numéros de comptes change les labels (catégories)
@@ -189,7 +258,8 @@ public class CSVRetouches {
             }
 
             String ligne = "\"" + record.getApollon().getLabel() + "\",\"" + libelle + "\",\"" + String.valueOf(record.getMontant())
-                    + "\",\"" + record.getNumeroCompte() + "\",\"" + record.getType() + "\"";
+                    + "\",\"" + (record.getApollon().getNumero() != null ?  record.getApollon().getNumero() : record.getNumeroCompte())
+                    + "\",\"" + record.getType() + "\"";
             lignes.add(ligne);
         }
 
@@ -217,7 +287,30 @@ public class CSVRetouches {
             return null;
         }
 
-        return libelle.trim().replace(" _", "").replace(" .", "").toUpperCase();
+        return StringUtils.normalizeSpace(libelle
+                .replace("_", "")
+                .replace(".", " ")
+                .replace("-", " ")
+                .replace("*", " ")
+                .replace("*", " ")
+                .replace("/", " ")
+                .replace("'", " ")
+                .replace(",", " ")
+                .replace("+", " ")
+                .replace(" NÂ°", " ")
+                .replace(" Â°", " ")
+                .replaceAll("[0-9]", " ")
+                .toUpperCase()
+                .trim())
+                .replace("C A R P I M K O", "CARPIMKO")
+                .replace("C A R P I M K", "CARPIMKO")
+                .replace("U R S S A F", "URSSAF")
+                .replace("PRLV", "PRELEVEMENT")
+                .replace("PRELEVMNT", "PRELEVEMENT")
+                .replace("PRÉLÈVEMENT", "PRELEVEMENT")
+                .replace("PRÉLVMT", "PRELEVEMENT")
+                .replace("PRELVMT", "PRELEVEMENT")
+                .replace("VIR ", "VIREMENT ");
     }
 
     /**
@@ -270,10 +363,13 @@ public class CSVRetouches {
     }
 
     private static boolean aRetirer(Apollon cat, String libelle) {
-        return (libelle.contains("CHEQUE") && !libelle.contains("VIR"))
+        return libelle.isEmpty()
+                || (libelle.contains("CHEQUE") && !libelle.contains("VIR"))
+                || (libelle.equals("E+"))
                 || (cat == Apollon.COMPTE_ATTENTE)
                 || (cat == Apollon.COMPTE_ATTENTE_IMMOBILISATIONS)
-                || (libelle.equals("AUCUN LIBELLÉ SPÉCIFIÉ POUR CETTE OPÉRATION"));
+                || (libelle.equals("AUCUN LIBELLÉ SPÉCIFIÉ POUR CETTE OPÉRATION"))
+                ;
     }
 
     private static String adapteCategorie(String cat, String libelle, String compte) {
@@ -296,6 +392,9 @@ public class CSVRetouches {
             }
             if (compte.equals("4720000")) {
                 return "COMPTE DATTENTE DES IMMOBILISATIONS";
+            }
+            if (compte.equals("7570000")) {
+                return "ACTIVITES ANNEXES";
             }
         }
 

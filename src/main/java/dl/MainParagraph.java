@@ -2,9 +2,7 @@ package dl;
 
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
-import dl.paragraph.CSVRetouches;
-import dl.paragraph.Categorisation;
-import dl.paragraph.CategorisationRNN;
+import dl.paragraph.*;
 import dl.paragraph.pojo.Apollon;
 import dl.paragraph.pojo.Record;
 import org.nd4j.linalg.api.ndarray.INDArray;
@@ -30,21 +28,29 @@ public class MainParagraph {
         setJavaLogger(Level.INFO);
         try {
 
-            // Permet de normaliser le jeux complet de données (vire des libellés non concluants, normalise un peu les libellés...)
-//            CSVRetouches.normaliseDataset("donnees/apollon_data_2018.csv");
-            // Sépare le jeux de données complet en 1 jeu de train, 1 jeu de test à 90%
-//            CSVRetouches.createTrainDataset("apollon_data_2018.normalise.csv", 90);
-
 //            Categorisation categorisation = new Categorisation();
-//            // Entrainement et création du modèle (long)
+////            // Entrainement et création du modèle (long)
 //            categorisation.train();
-//            // Evaluation du jeu de test
+////            // Evaluation du jeu de test
 //            categorisation.evaluate();
 
             // Catégorisation RNN
             CategorisationRNN categorisationRNN = new CategorisationRNN();
-            categorisationRNN.evaluate();
+            categorisationRNN.train_and_evaluate();
+//            categorisationRNN.evaluate();
+
 //            categorisationRNN.evaluateWithCnnSentenceDataSetIterator();
+//            // Catégorisation RNN
+//            CategorisationRNN categorisationRNN = new CategorisationRNN();
+//            categorisationRNN.evaluate();
+
+            // Catégorisation CNN
+//            CategorisationCNN categorisationCNN = new CategorisationCNN();
+//            categorisationCNN.evaluate();
+
+            // Catégorisation RNN W2Id
+//            CategorisationW2I CategorisationW2I = new CategorisationW2I();
+//            CategorisationW2I.evaluate();
 
 
 
