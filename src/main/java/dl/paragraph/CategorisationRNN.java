@@ -2,7 +2,9 @@ package dl.paragraph;
 
 import com.google.common.base.Stopwatch;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
+import dl.categorisation.word2vec.MyWord2Vec;
 import dl.paragraph.my.MyDataSetIterator;
 import dl.paragraph.pojo.Apollon;
 import dl.paragraph.pojo.Record;
@@ -14,24 +16,26 @@ import org.datavec.api.transform.schema.Schema;
 import org.datavec.api.util.ClassPathResource;
 import org.datavec.api.writable.Writable;
 import org.datavec.local.transforms.LocalTransformProcessRecordReader;
+import org.deeplearning4j.datasets.datavec.RecordReaderDataSetIterator;
 import org.deeplearning4j.eval.Evaluation;
-import org.deeplearning4j.iterator.CnnSentenceDataSetIterator;
-import org.deeplearning4j.iterator.provider.CollectionLabeledSentenceProvider;
 import org.deeplearning4j.models.embeddings.loader.WordVectorSerializer;
 import org.deeplearning4j.models.embeddings.wordvectors.WordVectors;
 import org.deeplearning4j.models.paragraphvectors.ParagraphVectors;
-import org.deeplearning4j.models.word2vec.VocabWord;
+import org.deeplearning4j.nn.api.Model;
 import org.deeplearning4j.nn.conf.GradientNormalization;
 import org.deeplearning4j.nn.conf.MultiLayerConfiguration;
 import org.deeplearning4j.nn.conf.NeuralNetConfiguration;
-import org.deeplearning4j.nn.conf.layers.LSTM;
-import org.deeplearning4j.nn.conf.layers.RnnOutputLayer;
+import org.deeplearning4j.nn.conf.layers.*;
 import org.deeplearning4j.nn.multilayer.MultiLayerNetwork;
 import org.deeplearning4j.nn.weights.WeightInit;
 import org.deeplearning4j.optimize.listeners.ScoreIterationListener;
+import org.deeplearning4j.text.tokenization.tokenizer.Tokenizer;
+import org.deeplearning4j.text.tokenization.tokenizer.preprocessor.CommonPreprocessor;
+import org.deeplearning4j.text.tokenization.tokenizerfactory.DefaultTokenizerFactory;
+import org.deeplearning4j.util.ModelSerializer;
 import org.nd4j.linalg.activations.Activation;
 import org.nd4j.linalg.api.ndarray.INDArray;
-import org.nd4j.linalg.dataset.api.iterator.DataSetIterator;
+import org.nd4j.linalg.dataset.DataSet;
 import org.nd4j.linalg.indexing.NDArrayIndex;
 import org.nd4j.linalg.learning.config.Adam;
 import org.nd4j.linalg.lossfunctions.LossFunctions;
@@ -40,7 +44,6 @@ import java.io.File;
 import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
 
 /**
  * Catégorisation neuronale !
@@ -63,106 +66,59 @@ public class CategorisationRNN {
 //    }
 
 
-    /**
-     * 1er essai avec un iterator maison.
-     * >>> IllegalStateException: Mis matched shapes
-     *
-     * @throws Exception
-     */
     public void evaluate() throws Exception {
-//        public void evaluate(List<Record> records) throws Exception {
 
         if (wordVectors == null) {
-            wordVectors = readModelFromFile();
+            MyWord2Vec myWord2vec = new MyWord2Vec();
+            wordVectors = myWord2vec.getWord2Vec();
         }
 
-        if (wordVectors == null) {
-            throw new Exception("Unable to load Word Vectors");
-        }
+        MultiLayerNetwork net = loadModel();
+        int batchSize = 1000;     //Number of examples in each minibatch
+        int truncateLibellesToLength = 30;  //Truncate reviews with length (# words) greater than this
 
-        if (CATEGORIES == null) {
-            throw new Exception("Il faut d'abord renseigner la liste complète des catégories pour évaluer");
-        }
+        // To SAVE //////////////////////////////////////////////////////////////////////////////////////////////////////////////
+        List<Record> testRecords  = readCSVRecords("apollon_data_2018.test.csv");
+        List<Record> trainRecords = readCSVRecords("apollon_data_2018.train.csv");
+        List<Record> allRecords = new ArrayList<>(testRecords);
+        allRecords.addAll(trainRecords);
+        List<String> labels = getCategories(allRecords);
+//        List<String> labels = Arrays.asList(new String[]{"ENTRETIEN ET REPARATIONS", "FRAIS DE TELECOMMUNICATION"});
+        // To SAVE //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-        int batchSize = 64;     //Number of examples in each minibatch
-        int vectorSize = wordVectors.getWordVector(wordVectors.vocab().wordAtIndex(0)).length;;   //Size of the word vectors
-        int nEpochs = 1;        //Number of epochs (full passes of training data) to train on
-        int truncateLibellesToLength = 100;  //Truncate reviews with length (# words) greater than this
-        final int seed = 0;     //Seed for reproducibility
-        int nbClasses = CATEGORIES.size();
-
-//        Nd4j.getMemoryManager().setAutoGcWindow(10000);  //https://deeplearning4j.org/workspaces
-
-
-        // DONNEES d'entrainement
-        List<Record> records = readCSVRecords("apollon_data_2018.train.csv");
-
-        // Liste des labels = liste des 111 catégories possibles
-        List<String> categories = CATEGORIES;
-        // Liste des labels = liste des 61 catégories distinctes présentes dans le jeu de train (attention potentiel catégories manquante présente dans le jeu de test ?!)
-//        List<String> categories = getCategories(records);
-//        nbClasses = categories.size();
-
-        MyDataSetIterator train = new MyDataSetIterator(wordVectors, records,
-                categories, batchSize, truncateLibellesToLength, false, false);
-
-        // DONNEES de TEST
-        records = readCSVRecords("apollon_data_2018.test.csv");
-//        List<String> categoriesTest = getCategories(records);
-        MyDataSetIterator test = new MyDataSetIterator(wordVectors, records,
-                categories, batchSize, truncateLibellesToLength, false, false);
-
-
-        //Set up network configuration
-        MultiLayerConfiguration conf = new NeuralNetConfiguration.Builder()
-                .seed(seed)
-                .updater(new Adam(5e-3, 0, 0, 0))
-                .l2(1e-5)
-                .weightInit(WeightInit.XAVIER)
-                .gradientNormalization(GradientNormalization.ClipElementWiseAbsoluteValue).gradientNormalizationThreshold(1.0)
-                .list()
-                .layer(0, new LSTM.Builder().nIn(vectorSize).nOut(256)
-                        .activation(Activation.TANH).build())
-                .layer(1, new RnnOutputLayer.Builder().activation(Activation.SOFTMAX)
-                        .lossFunction(LossFunctions.LossFunction.MCXENT).nIn(256).nOut(nbClasses).build())
-                .build();
-
-        MultiLayerNetwork net = new MultiLayerNetwork(conf);
-        net.init();
-        net.setListeners(new ScoreIterationListener(1));
-
-
-
-
-        Stopwatch started = Stopwatch.createStarted();
-        System.out.println("Training starting...");
-        for (int i = 0; i < nEpochs; i++) {
-            net.fit(train);
-            train.reset();
-            System.out.println("Training done in " + started.stop().elapsed(TimeUnit.SECONDS) + "s");
-            System.out.println("Epoch " + i + " complete.");
-            System.out.println("Evaluation starting...");
-            started.reset().start();
-
-            //Run evaluation. This is on 25k reviews, so can take some time
-            Evaluation evaluation = net.evaluate(test);
-            System.out.println("Evaluation done in " + started.stop().elapsed(TimeUnit.SECONDS) + "s");
-            System.out.println(evaluation.stats());
-        }
-
-
+        int nbLabels = labels.size();
+        System.out.println("Le jeu de données a " + nbLabels + " catégories");
 
         // Test 1 élément nouveau
-        INDArray features = test.loadFeaturesFromString("VIR ALMERYS SAS TP-20181224-ALMERYS TP -62 6152300-0098532001-0073-", truncateLibellesToLength);
-        INDArray networkOutput = net.output(features);
-        long timeSeriesLength = networkOutput.size(2);
-        INDArray probabilitiesAtLastWord = networkOutput.get(NDArrayIndex.point(0), NDArrayIndex.all(), NDArrayIndex.point((int) (timeSeriesLength - 1)));
+        MyDataSetIterator test  = new MyDataSetIterator(wordVectors, testRecords, labels, batchSize, truncateLibellesToLength, false, false);
 
-        System.out.println("\n\n-------------------------------");
-        System.out.println("Evaluation du libellé: [VIR ALMERYS SAS TP-20181224-ALMERYS TP -62 6152300-0098532001-0073-]");
-        System.out.println("\n\nProbabilities at last time step:");
-        System.out.println("p(positive): " + probabilitiesAtLastWord.getDouble(0));
-        System.out.println("p(negative): " + probabilitiesAtLastWord.getDouble(1));
+        INDArray features = test.loadFeaturesFromString("VIREMENT ALMERYS SAS TP 20181224 ALMERYS TP");
+//        Evaluation eval = new Evaluation(nbLabels);
+//        INDArray output = net.output(features);
+////        eval.eval(test.loadLabel("COMPTE DE L EXPLOITANT", truncateLibellesToLength), output);
+//        eval.eval(features);
+//        System.out.println(eval.stats());
+
+        INDArray networkOutput = net.output(features);
+        System.out.println("Evaluation du libellé : [VIREMENT ALMERYS SAS TP 20181224 ALMERYS TP]");
+        for (int i = 0; i < labels.size(); i++) {
+            System.out.println("[" + labels.get(i) + "] " + networkOutput.getDouble(i));
+        }
+
+
+//        long timeSeriesLength = truncateLibellesToLength;
+//        INDArray probabilitiesAtLastWord = networkOutput.get(NDArrayIndex.point(0), NDArrayIndex.all(), NDArrayIndex.point((int) (timeSeriesLength - 1)));
+//
+//        System.out.println("\n\n-------------------------------");
+//        System.out.println("Evaluation du libellé: [VIREMENT ALMERYS SAS TP 20181224 ALMERYS TP]");
+//        System.out.println("\n\nProbabilities at last time step:");
+//        System.out.println("");
+//        for (int i = 0; i < nbLabels; i++) {
+//            System.out.print("[" + labels.get(i) + "][" + probabilitiesAtLastWord.getDouble(i) + "]");
+//        }
+//        System.out.println("");
+
+
 
 
 //        Stopwatch started = Stopwatch.createStarted();
@@ -217,16 +173,20 @@ public class CategorisationRNN {
     }
 
 
+
     /**
-     * 2eme essai avec un CnnSentenceDataSetIterator.
-     * >>> DL4JInvalidInputException: Received input with size(1) = 1 (input array shape = [64, 1, 10, 100]); input.size(1) must match layer nIn size (nIn = 100)
+     * 1er essai avec un iterator maison.
+     * >>> IllegalStateException: Mis matched shapes
      *
      * @throws Exception
      */
-    public void evaluateWithCnnSentenceDataSetIterator() throws Exception {
+    public void train_and_evaluate() throws Exception {
+//        public void evaluate(List<Record> records) throws Exception {
 
         if (wordVectors == null) {
-            wordVectors = readModelFromFile();
+//            wordVectors = readModelFromFile();
+            MyWord2Vec myWord2vec = new MyWord2Vec();
+            wordVectors = myWord2vec.getWord2Vec();
         }
 
         if (wordVectors == null) {
@@ -237,83 +197,230 @@ public class CategorisationRNN {
             throw new Exception("Il faut d'abord renseigner la liste complète des catégories pour évaluer");
         }
 
-        int batchSize = 64;     //Number of examples in each minibatch
-        int vectorSize = wordVectors.getWordVector(wordVectors.vocab().wordAtIndex(0)).length;;   //Size of the word vectors
+
+        List<Record> testRecords  = readCSVRecords("apollon_data_2018.test.csv");
+        List<Record> trainRecords = readCSVRecords("apollon_data_2018.train.csv");
+        List<Record> allRecords = new ArrayList<>(testRecords);
+        allRecords.addAll(trainRecords);
+
+        printDataStats(trainRecords, testRecords);
+
+        List<String> labels = getCategories(allRecords);
+//        List<String> labels = Arrays.asList(new String[]{"ENTRETIEN ET REPARATIONS", "FRAIS DE TELECOMMUNICATION"});
+//        Collections.sort(labels); // FIXME A voir
+        int nbClasses = labels.size();
+        System.out.println("Num. classes : "+nbClasses);
+
+        int batchSize = 1000;     //Number of examples in each minibatch
+        int vectorSize = wordVectors.getWordVector(wordVectors.vocab().wordAtIndex(0)).length;   //Size of the word vectors
+        int vobabSize = wordVectors.vocab().numWords();
+        System.out.println("Vector size : "+vectorSize);
+        System.out.println("Vocab size : "+vobabSize);
+
         int nEpochs = 1;        //Number of epochs (full passes of training data) to train on
-        int truncateLibellesToLength = 100;  //Truncate reviews with length (# words) greater than this
+        int truncateLibellesToLength = 30;  //Truncate reviews with length (# words) greater than this
         final int seed = 0;     //Seed for reproducibility
-        int nbClasses = CATEGORIES.size();
 
-        //DataSetIterators for training and testing respectively
-        List<Record> records = readCSVRecords("apollon_data_2018.train.csv");
-        List<String> libelles = records.stream().map(Record::getLibelle).map(String::toLowerCase).collect(Collectors.toList());
-        List<String> categories = records.stream().map(Record::getCategorie).collect(Collectors.toList());
-        CollectionLabeledSentenceProvider coll = new CollectionLabeledSentenceProvider(libelles, categories);
-        DataSetIterator cnnSentenceDataSetIterator = new CnnSentenceDataSetIterator.Builder()
-                .sentenceProvider(coll)
-                .wordVectors(wordVectors)
-                .minibatchSize(batchSize)
-                .maxSentenceLength(truncateLibellesToLength)
-                .useNormalizedWordVectors(false)
-                .build();
 
-        List<Record> recordsTests = readCSVRecords("apollon_data_2018.test.csv");
-        List<String> libellesTest = records.stream().map(Record::getLibelle).map(String::toLowerCase).collect(Collectors.toList());
-        List<String> categoriesTest = records.stream().map(Record::getCategorie).collect(Collectors.toList());
-        CollectionLabeledSentenceProvider collTest = new CollectionLabeledSentenceProvider(libellesTest, categoriesTest);
-        DataSetIterator cnnSentenceDataSetIteratorTest = new CnnSentenceDataSetIterator.Builder()
-                .sentenceProvider(collTest)
-                .wordVectors(wordVectors)
-                .minibatchSize(batchSize)
-                .maxSentenceLength(truncateLibellesToLength)
-                .useNormalizedWordVectors(false)
-                .build();
+
+
+//        Nd4j.getMemoryManager().setAutoGcWindow(10000);  //https://deeplearning4j.org/workspaces
+
+
+        // https://www.youtube.com/watch?v=2-Ol7ZB0MmU
+
+        MyDataSetIterator train = new MyDataSetIterator(wordVectors, trainRecords, labels, batchSize, truncateLibellesToLength, false, false);
+        MyDataSetIterator test  = new MyDataSetIterator(wordVectors, testRecords, labels, batchSize, truncateLibellesToLength, false, false);
+
+//        printDataStats(trainRecords, testRecords);
+//
+//        System.out.println("-----------  Concordance  ------------------");
+//        String cat;
+//        cat = "PART PRIVEE DES DEPENSES MIXTES"; System.out.println(train.getLabelsClassMap().get(cat)+" <=> "+test.getLabelsClassMap().get(cat));
+//        cat = "HONORAIRES"; System.out.println(train.getLabelsClassMap().get(cat)+" <=> "+test.getLabelsClassMap().get(cat));
+//        cat = "FOURNITURES DE BUREAU ET ADMINISTRATIVES"; System.out.println(train.getLabelsClassMap().get(cat)+" <=> "+test.getLabelsClassMap().get(cat));
+//        cat = "COTISATIONS COMPLEMENTAIRES SANTE"; System.out.println(train.getLabelsClassMap().get(cat)+" <=> "+test.getLabelsClassMap().get(cat));
+//        cat = "FRAIS DE FORMATION SEMINAIRE"; System.out.println(train.getLabelsClassMap().get(cat)+" <=> "+test.getLabelsClassMap().get(cat));
+
+
+
+//        Nd4j.getMemoryManager().setAutoGcWindow(10000);  //https://deeplearning4j.org/workspaces
 
         //Set up network configuration
         MultiLayerConfiguration conf = new NeuralNetConfiguration.Builder()
                 .seed(seed)
-                .updater(new Adam(5e-3, 0, 0, 0))
+                .updater(new Adam(0.001D, 0.9D, 0.999D, 1.0E-8D))
                 .l2(1e-5)
                 .weightInit(WeightInit.XAVIER)
                 .gradientNormalization(GradientNormalization.ClipElementWiseAbsoluteValue).gradientNormalizationThreshold(1.0)
                 .list()
-                .layer(0, new LSTM.Builder().nIn(vectorSize).nOut(256)
-                        .activation(Activation.TANH).build())
-                .layer(1, new RnnOutputLayer.Builder().activation(Activation.SOFTMAX)
-                        .lossFunction(LossFunctions.LossFunction.MCXENT).nIn(256).nOut(nbClasses).build())
+                .layer(0, new LSTM.Builder().nIn(vectorSize).nOut(256).activation(Activation.TANH).build())
+//                .layer(1, new DenseLayer.Builder().nIn(256).nOut(256).weightInit(WeightInit.XAVIER).activation(Activation.RELU).build())
+                .layer(1, new RnnOutputLayer.Builder().nIn(256).nOut(nbClasses).activation(Activation.SOFTMAX).lossFunction(LossFunctions.LossFunction.MCXENT).build())
                 .build();
+
+
+
+        // !!!!!!!!!!!!!!!!
+//        nbClasses = categories.size();
+
+//        this.learningRate = 0.001D;
+
+//        //Set up network configuration
+//        MultiLayerConfiguration conf = new NeuralNetConfiguration.Builder()
+//                .seed(12345)
+//                .iterations(1)
+//                .weightInit(WeightInit.XAVIER)
+//                .updater(Updater.ADAGRAD)
+//                .activation(Activation.RELU)
+//                .optimizationAlgo(OptimizationAlgorithm.STOCHASTIC_GRADIENT_DESCENT)
+//                .learningRate(0.05)
+//                .regularization(true).l2(0.0001)
+//                .list()
+//                .layer(0, new DenseLayer.Builder().nIn(truncateLibellesToLength).nOut(30).weightInit(WeightInit.XAVIER).activation(Activation.RELU) //First hidden layer
+//                        .build())
+//                .layer(1, new OutputLayer.Builder().nIn(30).nOut(nbClasses).weightInit(WeightInit.XAVIER).activation(Activation.SOFTMAX) //Output layer
+//                        .lossFunction(LossFunctions.LossFunction.NEGATIVELOGLIKELIHOOD)
+//                        .build())
+//                .pretrain(false).backprop(true)
+//                .build();
+
+        // !!!!!!!!!!!!!!!!
+//        nbClasses = categories.size();
+
+////        this.learningRate = 0.001D;
+//        //Set up network configuration
+//        MultiLayerConfiguration conf = new NeuralNetConfiguration.Builder()
+//                .seed(seed)
+//                 .updater(new Adam(0.001D, 0.9D, 0.999D, 1.0E-8D))
+//                .l2(1e-5)
+//                .weightInit(WeightInit.XAVIER)
+//                .gradientNormalization(GradientNormalization.ClipElementWiseAbsoluteValue).gradientNormalizationThreshold(1.0)
+////                .optimizationAlgo(OptimizationAlgorithm.STOCHASTIC_GRADIENT_DESCENT)
+//                .list()
+//                .layer(0, new LSTM.Builder().nIn(vectorSize).nOut(nbClasses*2).activation(Activation.TANH).build())
+////                .layer(1, new DenseLayer.Builder().activation(Activation.RELU).nIn(nbClasses*2).nOut(nbClasses).build())
+//                .layer(1, new RnnOutputLayer.Builder().activation(Activation.SOFTMAX).lossFunction(LossFunctions.LossFunction.MCXENT).nIn(nbClasses*2).nOut(nbClasses).build())
+//                .build();
+
+//        MultiLayerConfiguration conf = new NeuralNetConfiguration.Builder()
+//                .seed(12345)
+//                .iterations(1)
+//                .weightInit(WeightInit.XAVIER)
+//                .updater(Updater.ADAGRAD)
+//                .activation(Activation.RELU)
+//                .optimizationAlgo(OptimizationAlgorithm.STOCHASTIC_GRADIENT_DESCENT)
+//                .learningRate(0.05)
+//                .regularization(true).l2(0.0001)
+//                .list()
+//                .layer(0, new DenseLayer.Builder().nIn(vectorSize).nOut(nbClasses*2).weightInit(WeightInit.XAVIER).activation(Activation.RELU) //First hidden layer
+//                        .build())
+//                .layer(1, new OutputLayer.Builder().nIn(nbClasses*2).nOut(nbClasses).weightInit(WeightInit.XAVIER).activation(Activation.SOFTMAX) //Output layer
+//                        .lossFunction(LossFunctions.LossFunction.NEGATIVELOGLIKELIHOOD)
+//                        .build())
+//                .pretrain(false).backprop(true)
+//                .build();
+
+        System.out.println("Config built");
+
 
         MultiLayerNetwork net = new MultiLayerNetwork(conf);
         net.init();
         net.setListeners(new ScoreIterationListener(1));
 
+
+
+
         Stopwatch started = Stopwatch.createStarted();
         System.out.println("Training starting...");
         for (int i = 0; i < nEpochs; i++) {
-            net.fit(cnnSentenceDataSetIterator);
-            cnnSentenceDataSetIterator.reset();
+            net.fit(train);
+            train.reset();
             System.out.println("Training done in " + started.stop().elapsed(TimeUnit.SECONDS) + "s");
             System.out.println("Epoch " + i + " complete.");
             System.out.println("Evaluation starting...");
             started.reset().start();
 
             //Run evaluation. This is on 25k reviews, so can take some time
-            Evaluation evaluation = net.evaluate(cnnSentenceDataSetIteratorTest);
+            Evaluation evaluation = net.evaluate(test);
             System.out.println("Evaluation done in " + started.stop().elapsed(TimeUnit.SECONDS) + "s");
             System.out.println(evaluation.stats());
         }
 
-        // Test 1 élément nouveau
-//        INDArray features = cnnSentenceDataSetIteratorTest.loadFeaturesFromString("VIR ALMERYS SAS TP-20181224-ALMERYS TP -62 6152300-0098532001-0073-", truncateLibellesToLength);
-//        INDArray networkOutput = net.output(features);
-//        long timeSeriesLength = networkOutput.size(2);
-//        INDArray probabilitiesAtLastWord = networkOutput.get(NDArrayIndex.point(0), NDArrayIndex.all(), NDArrayIndex.point((int) (timeSeriesLength - 1)));
-//
-//        System.out.println("\n\n-------------------------------");
-//        System.out.println("Evaluation du libellé: [VIR ALMERYS SAS TP-20181224-ALMERYS TP -62 6152300-0098532001-0073-]");
-//        System.out.println("\n\nProbabilities at last time step:");
-//        System.out.println("p(positive): " + probabilitiesAtLastWord.getDouble(0));
-//        System.out.println("p(negative): " + probabilitiesAtLastWord.getDouble(1));
+        System.out.println("################");
+        System.out.println("## Mots non vectorisés par notre modèle wordVectors (" + train.getWordsNonVectorises().size() + ") : ");
+        System.out.println(train.getWordsNonVectorises());
+
+        saveModel(net);
+    }
+
+    private HashMap<String, Integer> getCatFreq(List<Record> records) {
+        HashMap<String, Integer> catFreq = Maps.newHashMap();
+        for (Record record : records) {
+            String cat = record.getCategorie();
+            if (catFreq.containsKey(cat)) {
+                catFreq.put(cat, catFreq.get(cat) + 1);
+            } else {
+                catFreq.put(cat, 1);
+            }
+        }
+        return catFreq;
+    }
+
+    private void printDataStats(List<Record> train, List<Record> test) {
+        HashMap<String, Integer> trainFreq = this.getCatFreq(train);
+        HashMap<String, Integer> testFreq = this.getCatFreq(test);
+
+        System.out.println("\n\n\n-----------  Train  ------------------");
+        System.out.println("Num categories: "+trainFreq.size());
+        System.out.println("Category frequencies:");
+        for(Map.Entry<String, Integer> entry : trainFreq.entrySet()) {
+            System.out.println(entry.getKey()+" : "+entry.getValue());
+        }
+
+        System.out.println("\n\n\n-----------  Test  ------------------");
+        System.out.println("Num categories: "+testFreq.size());
+        System.out.println("Category frequencies:");
+        HashMap<String, Integer> missing = Maps.newHashMap();
+        for(Map.Entry<String, Integer> entry : testFreq.entrySet()) {
+            System.out.println(entry.getKey()+" : "+entry.getValue());
+            if (!trainFreq.containsKey(entry.getKey())) {
+                missing.put(entry.getKey(), 1);
+            }
+        }
+
+        System.out.println("\n\n\n-----------  Missing  ------------------");
+        System.out.println("Num categories: "+missing.size());
+        System.out.println("Categories:");
+        for(Map.Entry<String, Integer> entry : missing.entrySet()) {
+            System.out.println(entry.getKey()+" : "+entry.getValue());
+        }
+
+        System.out.println("\n\n\n");
+    }
+
+    private void saveModel(MultiLayerNetwork net) throws IOException {
+        File file = new File("model/rnn_model.zip");
+        ModelSerializer.writeModel(net, file, true);
+    }
+
+    private MultiLayerNetwork loadModel() throws IOException {
+        File file = new File("model/rnn_model.zip");
+        return ModelSerializer.restoreMultiLayerNetwork(file);
+    }
+
+
+    private List<String> tokenizeSentence(String sentence) {
+        DefaultTokenizerFactory tokenizerFactory = new DefaultTokenizerFactory();
+        tokenizerFactory.setTokenPreProcessor(new CommonPreprocessor());
+
+        Tokenizer t = tokenizerFactory.create(sentence);
+        List<String> tokens = new ArrayList<>();
+        while (t.hasMoreTokens()) {
+            String token = t.nextToken().toLowerCase();
+            tokens.add(token);
+        }
+        return tokens;
     }
 
     public void saveModel(ParagraphVectors model) {
@@ -362,7 +469,7 @@ public class CategorisationRNN {
                 .build();
 
         RecordReader rr = new CSVRecordReader();
-        rr.initialize(new FileSplit(new ClassPathResource(csvFileClasspath).getFile()));
+        rr.initialize(new FileSplit(new File(csvFileClasspath)));
         LocalTransformProcessRecordReader transformProcessRecordReader = new LocalTransformProcessRecordReader(rr, tp);
 
         List<Record> records = Lists.newArrayList();
@@ -378,4 +485,33 @@ public class CategorisationRNN {
         }
         return records;
     }
+
+    public HashMap<String, Integer> learnWord2Id(List<Record> records) {
+        Record record;
+        HashMap<String, Integer> wordFreq = Maps.newHashMap();
+        for (int i = 0; i < records.size(); i++) {
+            record = records.get(i);
+            List<String> tokens = tokenizeSentence(record.getLibelle());
+            for (String word : tokens) {
+                if (wordFreq.containsKey(word)) {
+                    wordFreq.put(word, wordFreq.get(word)+1);
+                } else {
+                    wordFreq.put(word, 1);
+                }
+            }
+        }
+
+        HashMap<String, Integer> word2id = Maps.newHashMap();
+        word2id.put("<unk>", word2id.size());
+        for(Map.Entry<String, Integer> entry : wordFreq.entrySet()) {
+            if (entry.getValue() > 1) {
+                word2id.put(entry.getKey(), word2id.size());
+            }
+        }
+
+        return word2id;
+    }
+
+
+
 }

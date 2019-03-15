@@ -75,6 +75,7 @@ public class ConfigsTests {
                 .learningRate(0.025)
                 .minLearningRate(0.001)
                 .epochs(20)
+                .layerSize(100)
                 .iterate(iterator)
                 .trainWordVectors(true)
                 .tokenizerFactory(tokenizerFactory)

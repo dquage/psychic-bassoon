@@ -2,7 +2,6 @@ package dl.paragraph.my;
 
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
-import dl.paragraph.pojo.Apollon;
 import dl.paragraph.pojo.Record;
 import org.deeplearning4j.iterator.CnnSentenceDataSetIterator;
 import org.deeplearning4j.models.embeddings.wordvectors.WordVectors;
@@ -45,6 +44,11 @@ public class MyDataSetIterator implements DataSetIterator {
     private int cursor = 0;
     private final TokenizerFactory tokenizerFactory;
 
+    private final List<String> wordsNonVectorises = Lists.newArrayList(); // Voir les mots ignorés par le modèle de wordVectors
+    public List<String> getWordsNonVectorises() {
+        return wordsNonVectorises;
+    }
+
     private boolean avecMontant;
     private boolean avecType;
 
@@ -59,7 +63,6 @@ public class MyDataSetIterator implements DataSetIterator {
         // Transformation des labels en integers
         this.labelsClassMap = Maps.newHashMap();
         int idx = 0;
-//        Collections.sort(this.labels); // FIXME A voir
         for (String s : this.labels) {
             this.labelsClassMap.put(s, idx++);
         }
@@ -92,7 +95,7 @@ public class MyDataSetIterator implements DataSetIterator {
 
     private DataSet nextDataSet(int num) throws IOException {
 
-        System.out.println(">>> Batch START position : [" + cursor + "]");
+        System.out.println(">>> Batch START position : [" + cursor + "] ("+num+")");
 
         // Tokenize les num prochains libellés
 //        List<List<String>> allTokens = Lists.newArrayListWithCapacity(currents.size());
@@ -104,6 +107,12 @@ public class MyDataSetIterator implements DataSetIterator {
         for (int i = 0; i < num && cursor < totalExamples(); i++) {
             record = records.get(cursor);
             cursor++; // on avancesur le prochain élément du jeu de données
+
+            if (!this.labelsClassMap.containsKey(record.getCategorie())) {
+                i--;
+                continue;
+//                throw new IllegalStateException("Got label that is not present in list of LabeledSentenceProvider labels");
+            }
 
             List<String> tokens = tokenizeSentence(record.getLibelle());
             if (!tokens.isEmpty()) {
@@ -128,28 +137,56 @@ public class MyDataSetIterator implements DataSetIterator {
         System.out.println(">>> Batch de [" + currents.size() + "] éléments, maxLength [" + maxLength + "], minLength [" + minLength + "]");
 
         //Create data for training
-        //Here: we have currents.size() examples of varying lengths
-        INDArray features = Nd4j.create(new int[]{currents.size(), vectorSize, maxLength}, 'f'); // rank 3
-//        INDArray labels = Nd4j.create(new int[]{currents.size(), this.labels.size(), maxLength}, 'f');
-        INDArray labels = Nd4j.create(currents.size(), this.labels.size()); // rank 2
-//        INDArray labelsMask = Nd4j.zeros(currents.size(), maxLength);
+        INDArray features = Nd4j.create(new int[]{currents.size(), vectorSize, truncateLength}, 'f'); // rank 3
+        INDArray labels = Nd4j.create(new int[]{currents.size(), this.labels.size(), truncateLength}, 'f'); // rank 3
+        INDArray featuresMask = Nd4j.zeros(currents.size(), truncateLength); // positions des vecteurs de features pour lesquels la valeur est une donnée (ex. pour un vecteur plus court que maxlength, la fin du vecteur aura des zeros dans featuresMask)
+        INDArray labelsMask = Nd4j.zeros(currents.size(), truncateLength);
 
 
         // Construction du vecteur du libellé : FEATURES
-        INDArrayIndex[] idxs = new INDArrayIndex[3];
-        idxs[1] = NDArrayIndex.all();
         for (int i = 0; i < tokenizedRecord.size(); i++) {
-            idxs[0] = NDArrayIndex.point(i);
-            List<String> currSentence = tokenizedRecord.get(i).getKey();
-            for (int j = 0; j < currSentence.size() && j < maxLength; j++) {
-                idxs[2] = NDArrayIndex.point(j);
-                String word = currSentence.get(j);
-                INDArray vector = wordVectors.getWordVectorMatrix(word);
-//                System.out.println(">>> >>> idxs [" + word + "] [" + idxs[0].current() + "][" + idxs[1].current() + "][" + idxs[2].current() + "]");
-//                System.out.println(">>> >>> Vector [" + word + "] [" + Arrays.toString(vector.shape()) + "] [" + vector.columns() + "] [" + vector.rows() + "]");
-//                INDArray vectorNormi = wordVectors.getWordVectorMatrixNormalized(word);
-                features.put(idxs, vector);
+
+
+            List<String> tokens = tokenizedRecord.get(i).getKey();
+
+            int seqLength = Math.min(tokens.size(), maxLength);
+
+            final INDArray vectors = wordVectors.getWordVectors(tokens.subList(0, seqLength)).transpose();
+
+//            INDArrayIndex[] idxs = new INDArrayIndex[3];
+
+//            idxs[0] = NDArrayIndex.point(i);
+//            idxs[1] = NDArrayIndex.all();
+
+            features.put(new INDArrayIndex[] {
+                    NDArrayIndex.point(i),
+                    NDArrayIndex.all(),
+                    NDArrayIndex.interval(0, seqLength)
+            }, vectors);
+
+            featuresMask.get(new INDArrayIndex[] {NDArrayIndex.point(i), NDArrayIndex.interval(0, seqLength)}).assign(1);
+
+
+            String labelStr = tokenizedRecord.get(i).getValue().getCategorie();
+            if (!this.labelsClassMap.containsKey(labelStr)) {
+                throw new IllegalStateException("Got label \"" + labelStr + "\" that is not present in list of LabeledSentenceProvider labels");
             }
+            int labelIdx = this.labelsClassMap.get(labelStr);
+
+//            System.out.println("Label "+labelStr+" => "+labelIdx);
+
+            labels.putScalar(new int[]{i, labelIdx, seqLength-1}, 1.0);
+            labelsMask.putScalar(new int[]{i, seqLength-1},1.0);
+
+//            for (int j = 0; j < currSentence.size() && j < maxLength; j++) {
+//                idxs[2] = NDArrayIndex.point(j);
+//                String word = currSentence.get(j);
+//                INDArray vector = wordVectors.getWordVectorMatrix(word);
+////                System.out.println(">>> >>> Vector [" + word + "] [" + Arrays.toString(vector.shape()) + "] [" + vector.columns() + "] [" + vector.rows() + "]");
+////                INDArray vectorNormi = wordVectors.getWordVectorMatrixNormalized(word);
+//                features.put(idxs, vector);
+//            }
+
 //            System.out.println(">>> >>> Features [" + currSentence + "] [" + Arrays.toString(features.shape()) + "]");
         }
 
@@ -166,36 +203,36 @@ public class MyDataSetIterator implements DataSetIterator {
         // 3) All elements between 0 and the length of the current sequence
 //        features.put(new INDArrayIndex[]{NDArrayIndex.point(i), NDArrayIndex.all(), NDArrayIndex.interval(0, seqLength)}, vectors);
 
+//
+//        // FEATURES MASK
+//        //Because we are dealing with reviews of different lengths and only one output at the final time step: use padding arrays
+//        //Mask arrays contain 1 if data is present at that time step for that example, or 0 if data is just padding
+//        INDArray featuresMask = null;
+//        if (minLength != maxLength) {
+//            featuresMask = Nd4j.zeros(currents.size(), maxLength);
+//            // Assign "1" to each position where a feature is present, that is, in the interval of [0, seqLength)
+////            featuresMask.get(new INDArrayIndex[]{NDArrayIndex.point(i), NDArrayIndex.interval(0, seqLength)}).assign(1);
+//            for (int i = 0; i < tokenizedRecord.size(); i++) {
+//                int libelleLength = tokenizedRecord.get(i).getKey().size();
+//                if (libelleLength >= maxLength) {
+//                    featuresMask.getRow(i).assign(1.0);
+//                } else {
+//                    featuresMask.get(NDArrayIndex.point(i), NDArrayIndex.interval(0, libelleLength)).assign(1.0);
+//                }
+//            }
+//        }
 
-        // FEATURES MASK
-        //Because we are dealing with reviews of different lengths and only one output at the final time step: use padding arrays
-        //Mask arrays contain 1 if data is present at that time step for that example, or 0 if data is just padding
-        INDArray featuresMask = null;
-        if (minLength != maxLength) {
-            featuresMask = Nd4j.zeros(currents.size(), maxLength);
-            // Assign "1" to each position where a feature is present, that is, in the interval of [0, seqLength)
-//            featuresMask.get(new INDArrayIndex[]{NDArrayIndex.point(i), NDArrayIndex.interval(0, seqLength)}).assign(1);
-            for (int i = 0; i < tokenizedRecord.size(); i++) {
-                int libelleLength = tokenizedRecord.get(i).getKey().size();
-                if (libelleLength >= maxLength) {
-                    featuresMask.getRow(i).assign(1.0);
-                } else {
-                    featuresMask.get(NDArrayIndex.point(i), NDArrayIndex.interval(0, libelleLength)).assign(1.0);
-                }
-            }
-        }
-
-
-        // Construction du vecteur des LABELS (catégorie)
-        for (int i = 0; i < tokenizedRecord.size(); i++) {
-            record = tokenizedRecord.get(i).getValue();
-            String labelStr = record.getCategorie();
-            if (!this.labelsClassMap.containsKey(labelStr)) {
-                throw new IllegalStateException("Got label \"" + labelStr + "\" that is not present in list of LabeledSentenceProvider labels");
-            }
-            int labelIdx = this.labelsClassMap.get(labelStr);
-            labels.putScalar(i, labelIdx, 1.0);
-        }
+//
+//        // Construction du vecteur des LABELS (catégorie)
+//        for (int i = 0; i < tokenizedRecord.size(); i++) {
+//            record = tokenizedRecord.get(i).getValue();
+//            String labelStr = record.getCategorie();
+//            if (!this.labelsClassMap.containsKey(labelStr)) {
+//                throw new IllegalStateException("Got label \"" + labelStr + "\" that is not present in list of LabeledSentenceProvider labels");
+//            }
+//            int labelIdx = this.labelsClassMap.get(labelStr);
+//            labels.putScalar(new int[]{i, labelIdx, }, 1.0);
+//        }
 
         // FIXME A vérifier
 //            int lastIdx = Math.min(tokens.size(), maxLength);
@@ -207,8 +244,9 @@ public class MyDataSetIterator implements DataSetIterator {
 
 
 
+        return new DataSet(features, labels, featuresMask, labelsMask);
+//        return new DataSet(features, labels, featuresMask, (INDArray) null);
 //        return new DataSet(features, labels, featuresMask, labelsMask);
-        return new DataSet(features, labels, featuresMask, (INDArray) null);
     }
 
     @Override
@@ -218,7 +256,7 @@ public class MyDataSetIterator implements DataSetIterator {
 
     @Override
     public int inputColumns() {
-        return vectorSize;
+        return truncateLength;
     }
 
     @Override
@@ -336,27 +374,47 @@ public class MyDataSetIterator implements DataSetIterator {
      * Used post training to convert a String to a features INDArray that can be passed to the network output method
      *
      * @param reviewContents Contents of the review to vectorize
-     * @param maxLength Maximum length (if review is longer than this: truncate to maxLength). Use Integer.MAX_VALUE to not nruncate
+//     * @param maxLength Maximum length (if review is longer than this: truncate to maxLength). Use Integer.MAX_VALUE to not nruncate
      * @return Features array for the given input String
      */
-    public INDArray loadFeaturesFromString(String reviewContents, int maxLength){
+    public INDArray loadFeaturesFromString(String reviewContents) {
 
         List<String> tokens = tokenizeSentence(reviewContents);
-        int outputLength = Math.max(maxLength, tokens.size());
-        INDArray features = Nd4j.create(1, vectorSize, outputLength);
 
-        int count = 0;
-        for (int j = 0; j < tokens.size() && count < maxLength; j++) {
-            String token = tokens.get(j);
-            INDArray vector = wordVectors.getWordVectorMatrix(token);
-            if (vector == null) {
-                continue;   //Word not in word vectors
-            }
-            features.put(new INDArrayIndex[]{NDArrayIndex.point(0), NDArrayIndex.all(), NDArrayIndex.point(j)}, vector);
-            count++;
-        }
+        int outputLength = Math.min(truncateLength, tokens.size());
+
+//        INDArray features = Nd4j.create(1, vectorSize, outputLength);
+        int[] featuresShape = new int[] {1, vectorSize, outputLength};
+        INDArray features = Nd4j.create(featuresShape, 'f');
+
+        final INDArray vectors = wordVectors.getWordVectors(tokens.subList(0, outputLength)).transpose();
+        features.put(new INDArrayIndex[] {
+                NDArrayIndex.point(0),
+                NDArrayIndex.all(),
+                NDArrayIndex.interval(0, outputLength)
+        }, vectors);
+
+//        int count = 0;
+//        for (int i = 0; i < outputLength; i++) {
+//            String token = tokens.get(i);
+//            INDArray vector = wordVectors.getWordVectorMatrix(token);
+////            final INDArray vector = wordVectors.getWordVector(token);
+//            if (vector == null) {
+//                continue;   //Word not in word vectors
+//            }
+//            features.put(new INDArrayIndex[]{NDArrayIndex.point(0), NDArrayIndex.all(), NDArrayIndex.point(i)}, vector);
+//            count++;
+//        }
 
         return features;
+    }
+
+    public INDArray loadLabel(String label, int maxLength) {
+
+        // TODO A fixer
+        INDArray labels = Nd4j.create(new int[]{1, this.labels.size(), truncateLength}, 'f'); // rank 3
+        int labelIdx = this.labelsClassMap.get(label);
+        return labels.putScalar(new int[]{0, labelIdx, maxLength-1}, 1.0);
     }
 
     private List<String> tokenizeSentence(String sentence) {
@@ -364,14 +422,19 @@ public class MyDataSetIterator implements DataSetIterator {
         Tokenizer t = tokenizerFactory.create(sentence);
         List<String> tokens = new ArrayList<>();
         while (t.hasMoreTokens()) {
-            String token = t.nextToken();
+            String token = t.nextToken().toLowerCase();
+//            if (!word2id.containsKey(token))
+//                token = "<unk>";
             if (!wordVectors.hasWord(token)) {
-//                switch (unknownWordHandling) {
-//                    case RemoveWord:
+                if (!wordsNonVectorises.contains(token)) {
+                    wordsNonVectorises.add(token);
+                }
+////                switch (unknownWordHandling) {
+////                    case RemoveWord:
                         continue;
-//                    case UseUnknownVector:
-//                        token = UNKNOWN_WORD_SENTINEL;
-//                }
+////                    case UseUnknownVector:
+////                        token = UNKNOWN_WORD_SENTINEL;
+////                }
             }
             tokens.add(token);
         }

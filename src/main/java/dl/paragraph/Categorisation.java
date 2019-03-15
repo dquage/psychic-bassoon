@@ -23,6 +23,14 @@ import org.deeplearning4j.models.embeddings.inmemory.InMemoryLookupTable;
 import org.deeplearning4j.models.embeddings.loader.WordVectorSerializer;
 import org.deeplearning4j.models.paragraphvectors.ParagraphVectors;
 import org.deeplearning4j.models.word2vec.VocabWord;
+import org.deeplearning4j.nn.conf.GradientNormalization;
+import org.deeplearning4j.nn.conf.MultiLayerConfiguration;
+import org.deeplearning4j.nn.conf.NeuralNetConfiguration;
+import org.deeplearning4j.nn.conf.layers.LSTM;
+import org.deeplearning4j.nn.conf.layers.RnnOutputLayer;
+import org.deeplearning4j.nn.multilayer.MultiLayerNetwork;
+import org.deeplearning4j.nn.weights.WeightInit;
+import org.deeplearning4j.optimize.listeners.ScoreIterationListener;
 import org.deeplearning4j.text.documentiterator.LabelAwareIterator;
 import org.deeplearning4j.text.documentiterator.LabelledDocument;
 import org.deeplearning4j.text.documentiterator.LabelsSource;
@@ -30,7 +38,10 @@ import org.deeplearning4j.text.sentenceiterator.interoperability.SentenceIterato
 import org.deeplearning4j.text.tokenization.tokenizer.preprocessor.CommonPreprocessor;
 import org.deeplearning4j.text.tokenization.tokenizerfactory.DefaultTokenizerFactory;
 import org.deeplearning4j.text.tokenization.tokenizerfactory.TokenizerFactory;
+import org.nd4j.linalg.activations.Activation;
 import org.nd4j.linalg.api.ndarray.INDArray;
+import org.nd4j.linalg.learning.config.Adam;
+import org.nd4j.linalg.lossfunctions.LossFunctions;
 import org.nd4j.linalg.primitives.Pair;
 
 import java.io.File;
@@ -52,27 +63,52 @@ public class Categorisation {
     public void train() throws IOException, InterruptedException {
 
         // Fichier de la forme : CATEGORIE,LIBELLE,MONTANT
-        LabelAwareIterator iterator = readCSVDataset("apollon_data_2018.train.csv", avecMontant, avecType);
+        LabelAwareIterator iterator = readCSVDataset("apollon_data_2018.normalise.csv", avecMontant, avecType);
 
         TokenizerFactory tokenizerFactory = new DefaultTokenizerFactory();
         tokenizerFactory.setTokenPreProcessor(new CommonPreprocessor());
 
         // ParagraphVectors training configuration
-        paragraphVectors = ConfigsTests.config2c(iterator, tokenizerFactory);
+        paragraphVectors = ConfigsTests.config2b(iterator, tokenizerFactory);
 
         // Start model training
         System.out.println("Train starting...");
-        Stopwatch started = Stopwatch.createStarted();
+//        Stopwatch started = Stopwatch.createStarted();
         paragraphVectors.fit();
-        System.out.println("Train done in " + started.stop().elapsed(TimeUnit.SECONDS) + "s");
+//        System.out.println("Train done in " + started.stop().elapsed(TimeUnit.SECONDS) + "s");
+        System.out.println("Train done");
+
+        int vectorSize = paragraphVectors.getWordVector(paragraphVectors.vocab().wordAtIndex(0)).length;   //Size of the word vectors
+        int vocabSite = paragraphVectors.vocab().vocabWords().size();   //Size of the word vectors
+        System.out.println("Vocab : " + vocabSite);
+        System.out.println("Vector : " + vectorSize);
 
         saveModel(paragraphVectors);
+
+//        //Set up network configuration
+//        MultiLayerConfiguration conf = new NeuralNetConfiguration.Builder()
+//                .seed(seed)
+//                .updater(new Adam()) // 5e-3
+//                .l2(1e-5)
+//                .weightInit(WeightInit.XAVIER)
+//                .gradientNormalization(GradientNormalization.ClipElementWiseAbsoluteValue).gradientNormalizationThreshold(1.0)
+//                .list()
+//                .layer(0, new LSTM.Builder().nIn(vectorSize).nOut(256)
+//                        .activation(Activation.TANH).build())
+//                .layer(1, new RnnOutputLayer.Builder().activation(Activation.SOFTMAX)
+//                        .lossFunction(LossFunctions.LossFunction.MCXENT).nIn(256).nOut(2).build())
+//                .build();
+//
+//        MultiLayerNetwork net = new MultiLayerNetwork(conf);
+//        net.init();
+//        net.setListeners(new ScoreIterationListener(1));
+//
     }
 
     public void evaluate() throws Exception {
 
         // Fichier de la forme : CATEGORIE,LIBELLE,MONTANT
-        evaluate(readCSVRecordsTest("apollon_data_2018.test.csv"));
+        evaluate(readCSVRecordsTest("apollon_data_2018.test_small.csv"));
     }
 
     public void evaluate(List<Record> records) throws Exception {
@@ -211,7 +247,7 @@ public class Categorisation {
         // - Libellé
         // - Catégorie
         RecordReader rr = new CSVRecordReader();
-        rr.initialize(new FileSplit(new ClassPathResource(csvFileClasspath).getFile()));
+        rr.initialize(new FileSplit(new File(csvFileClasspath)));
         LocalTransformProcessRecordReader transformProcessRecordReader = new LocalTransformProcessRecordReader(rr, tp);
 
         List<String> categoriesLoaded = getCategories(transformProcessRecordReader);
@@ -258,7 +294,7 @@ public class Categorisation {
                 .build();
 
         RecordReader rr = new CSVRecordReader();
-        rr.initialize(new FileSplit(new ClassPathResource(csvFileClasspath).getFile()));
+        rr.initialize(new FileSplit(new File(csvFileClasspath)));
         LocalTransformProcessRecordReader transformProcessRecordReader = new LocalTransformProcessRecordReader(rr, tp);
 
         List<Record> records = Lists.newArrayList();

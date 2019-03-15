@@ -12,8 +12,10 @@ import org.datavec.api.util.ClassPathResource;
 import org.datavec.api.writable.Writable;
 import org.datavec.local.transforms.LocalTransformProcessRecordReader;
 import org.deeplearning4j.models.embeddings.learning.ElementsLearningAlgorithm;
+import org.deeplearning4j.models.embeddings.learning.impl.elements.CBOW;
 import org.deeplearning4j.models.embeddings.learning.impl.elements.SkipGram;
 import org.deeplearning4j.models.embeddings.loader.WordVectorSerializer;
+import org.deeplearning4j.models.embeddings.reader.impl.BasicModelUtils;
 import org.deeplearning4j.models.word2vec.VocabWord;
 import org.deeplearning4j.models.word2vec.Word2Vec;
 import org.deeplearning4j.text.sentenceiterator.CollectionSentenceIterator;
@@ -50,18 +52,45 @@ public class MyWord2Vec {
 
         ElementsLearningAlgorithm<VocabWord> learningAlgorithm = new SkipGram<>();
 
+//        System.out.println("libelles:");
+//        for (int i=0; i<10; i++) {
+//            System.out.println(libelles.get(i));
+//        }
+
         System.out.println("word2vec apprentissage");
         SentenceIterator iter = new CollectionSentenceIterator(new MySimpleSentencePreProcessor(), libelles);
         Word2Vec vec = new Word2Vec.Builder()
-                .elementsLearningAlgorithm(learningAlgorithm)
-                .minWordFrequency(5)
+                .elementsLearningAlgorithm(new SkipGram<>())
+//                .elementsLearningAlgorithm(new CBOW<>())
                 .iterations(15)
                 .layerSize(VEC_LENGTH)
-                .seed(42)
+                .seed(123)
                 .windowSize(5)
+                .minWordFrequency(5)// cc
+                .learningRate(0.025) // cc
+//                .useAdaGrad(true)
+//                .useHierarchicSoftmax(true) // cc
+//                .sampling(0)
+//                .negativeSample(0) // dd
+//                .modelUtils(new BasicModelUtils<VocabWord>())
+//                .useUnknown(true) // TODO A voir, remplace par UNK quels mots ?
+//                .batchSize(1000)
+//                .allowParallelTokenization(true) // enable parallel tokenization
+//                .workers(4) // number of threads
                 .iterate(iter)
                 .tokenizerFactory(t)
                 .build();
+
+//        Word2Vec vec = new Word2Vec.Builder()
+//                .elementsLearningAlgorithm(learningAlgorithm)
+//                .minWordFrequency(1)
+//                .iterations(15)
+//                .layerSize(VEC_LENGTH)
+//                .seed(42)
+//                .windowSize(5)
+//                .iterate(iter)
+//                .tokenizerFactory(t)
+//                .build();
 
         System.out.println("word2vec fit");
         vec.fit();
@@ -95,10 +124,9 @@ public class MyWord2Vec {
 
         List<String> libelles = Lists.newArrayList();
         Schema inputDataSchema = new Schema.Builder()
-                .addColumnsString("Id", "NumCba")
+                .addColumnsString("Categorie", "Libelle")
                 .addColumnDouble("Montant")
-                .addColumnsString("Libelle", "NumCompte")
-                .addColumnCategorical("Categorie", Arrays.asList(CategorisationTrain.CATEGORIES))
+                .addColumnsString("Compte", "Type")
                 .build();
 
         //Print out the schema:
@@ -112,12 +140,11 @@ public class MyWord2Vec {
 
         // Permet de conditionner, transformer, enlever les data que l'on récupère du CSV
         TransformProcess tp = new TransformProcess.Builder(inputDataSchema)
-                .removeColumns("Id", "NumCba", "Montant", "NumCompte")
-                .categoricalToInteger("Categorie")
+                .removeColumns("Categorie", "Montant", "Compte", "Type")
                 .build();
 
         RecordReader rr = new CSVRecordReader();
-        rr.initialize(new FileSplit(new ClassPathResource("depenses2017.data").getFile()));
+        rr.initialize(new FileSplit(new File("apollon_data_2018.train.csv")));
 
         LocalTransformProcessRecordReader transformProcessRecordReader = new LocalTransformProcessRecordReader(rr, tp);
         while (transformProcessRecordReader.hasNext()) {
